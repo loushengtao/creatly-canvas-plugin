@@ -1,45 +1,26 @@
-# 画布 JSON 与 MCP 执行
+# 远程 MCP 执行协议（dev）
 
-## 连接与发现
+## 连接与授权
 
-本插件通过本地 stdio MCP 适配器复用已跑通的画布桥接。前端必须以 `pnpm dev:canvas` 运行，并保持已登录画布页面打开。默认地址为 `http://127.0.0.1:3000`，可用 `YUANJI_CANVAS_URL` 指定其他本地端口。
+本分支直接连接 `https://dev.yuanji.studio/api/agent/mcp/v2`，使用标准 Streamable HTTP MCP 与 OAuth。无需本地画布服务、bridge.token 或保持浏览器画布打开。由宿主完成授权发现、浏览器登录、PKCE 和令牌刷新；不索取或复制用户密码、Cookie、Access Token，不使用本地桥接替代授权。
 
-先调用 `canvas_status` 核对后端地址、页面与账号登录状态，再调用 `canvas_describe_tools` 获取当前部署的工具名称、输入 JSON Schema 和确认要求。多页面时显式传 `clientId`。工具发现失败就说明失败原因，不采用过期的静态列表。项目可通过 `canvas_list_projects` 查找。
+首次使用按宿主提示打开 dev 网站完成授权，确认账号和空间。通过标准 MCP `tools/list` 获取当前部署的工具及完整 inputSchema；不要调用旧本地适配器独有的 `canvas_status`、`canvas_describe_tools` 或 `canvas_list_projects`。若宿主已发现工具，直接读取其最新定义。若提供 `getAuthorizationContext`，用它核对授权上下文。
 
-桥接转发 `GET /api/agent/mcp/tools` 与 `POST /api/agent/mcp/call`。不要求 v2、Film DSL 编译器、浏览器交接工具，也不签发另一套浏览器登录凭据。浏览器负责原有会话及刷新；插件不复制 access token，不关闭、刷新或替换用户页面。
+工具不可用、未授权或权限不足时给出实际错误，不能使用过期工具目录冒充连接成功。项目与模型目录通过当前实际工具查询。
 
-## 当前 JSON
+## 参数与画布状态
 
-`getCanvasContext` 返回当前后端画布 JSON，节点、关系、位置、版本、媒体文件等以实际返回字段为准。没有返回的字段不能推测成已读取；大整数 ID 与版本使用字符串。不要建立另一个可写的 Film 文档副本。
+标准 v2 工具参数按实时 inputSchema **平铺**传递，不包裹旧版 `payload`，不传本地 `clientId`。projectId/nodeId 等使用服务端返回的原始不透明字符串，不解密、不转换成数据库数字，也不直接传整个 workbench URL。版本号和其他字段遵循实际 Schema 的类型。
 
-可以在回复中从画布 JSON 整理概览；后端若正式提供详细画布工具，则按实时 Schema 调用。尚未部署的 `getCanvasDetail` 不会由插件伪装为已有工具。分场、镜头、资产、播放顺序可以作为只读整理视图；画布始终是状态来源。
+先读取 `getCanvasContext`，保留节点、关系、位置、媒体、版本及状态摘要。读取返回的 scope 必须覆盖修改范围；过滤快照不能当作完整画布。缺少字段不等于空值，不建立另一个可写 Film DSL 副本。
 
-业务工具参数由上下文和 payload 两层组成，例如读取画布：
+写入按实时定义提供 `idempotencyKey`、`expectedNodeStates`、`expectedDeletion`、`expectedSourceFiles` 等所需字段。摘要来自当前快照，不能凭空补造；冲突后先重新读取并检查用户改动。相同操作使用稳定幂等键，参数改变视为新操作。工具失败或超时先查原状态，不自动重复写入或付费生成。
 
-```json
-{
-  "clientId": "<canvas_status 中选定的页面 ID>",
-  "projectId": "<真实项目 ID 或 workbench URL>",
-  "payload": {}
-}
-```
+## 生成与交付
 
-`projectId`、`baseVersion`、`conversationId` 等放在外层，具体业务字段放在 `payload`。不得把 v2 的扁平参数直接套用到这个接口。省略 projectId 时只在唯一已登录页面的 workbench 路径可解析时推断；创建项目不从现有页面继承项目 ID。
-
-## 写入与生成
-
-1. 读取画布并记录版本，识别已有节点和实际缺口。
-2. 按实时 Schema 用 `createNode`、`updateNode`、主体和引用工具写入。后端支持批量时使用批量，真实 ID、输入关系和节点位置使用后端暴露的字段；不要假定旧版与 v2 参数相同。
-3. 回读画布验证节点、关系和内容。版本冲突先重新读取并检查用户修改，不覆盖未知变化。
-4. 用户明确要求生成时，按后端实际提供的 `batchGenerateImage`、`batchGenerateVideo`、`batchGenerateAudio` 等工具提交。工具名存在不等于所有模型与参数都可用，配置必须来自实时 Schema、已有有效节点配置或明确的当前模型资料，缺少时说明缺口。
-5. 涉及费用先按当前后端流程估算并取得所需确认。仅在用户明确批准对应操作后使用后端要求的确认工具；不把预算预估当作批准。
-6. 用 `getTaskStatus` 等当前提供的状态工具查询原任务，回读非空媒体文件。网络超时、结果未知或失败时不自动重试写入或生成；请求 ID 不是后端幂等保证。
-7. 输入齐全时按明确顺序使用 `previewAssemble`，回读真实结果。生成受理、生成终态、媒体挂载、视觉验收分别判断。
-
-不强制固定模型，不为缺失能力安装第三方媒体 CLI。用户的模型与制作范围优先。没有像素或音频证据时，不宣称画面、表演或声音已通过验收。
-
-## 恢复与交付
-
-继续任务先读画布和原任务状态，保留成功节点；失败只处理明确范围。节点有完成状态但没有文件时说明缺口，不能写入虚假的完成标记。后端返回的稳定 projectUrl 可用于打开项目，需要登录的页面仍由用户登录。
-
-最终报告实际节点、文件、成片与未完成项。可以保存 JSON 作为快照或交付附件，但文件保存不能冒充平台写入成功。
+1. 用户明确要求生成后，读取节点、参考文件及实时模型配置，准备实际生成参数。
+2. 未指定时默认 **Creatly Sigma 2.5 Sunburst、2K**。当前模型标识为 `gpt-image-2.5-sunburst`、function 为 `gpt25_sunburst`、modelConfigId 为 `image_gpt25_sunburst`、resolution 为 `2k`；以当前模型目录验证可用性。用户明确指定的模型、分辨率、质量和数量优先。默认模型不可用时说明缺口，不擅自换模型。
+3. 节点配置、费用估算和生成请求参数保持一致。按实际后端流程估算并取得必要确认；需要浏览器确认时使用服务端返回的确认链接，不伪造 confirmationTaskId 或绕过授权。
+4. 提交后查询原任务，回读非空 frameFiles/videoFiles/audioFiles 等实际媒体；受理、生成终态、挂载和视觉验收分别判断。
+5. 保留成功结果。用户指定的待处理节点保持原状，不因默认参数改变而重生成。没有像素或音频证据时，不宣称质量验收通过。
+6. 按实际工具提供的预览与项目链接交付；浏览器交接仅使用服务端生成的链接，不复制凭据到网址或文件。

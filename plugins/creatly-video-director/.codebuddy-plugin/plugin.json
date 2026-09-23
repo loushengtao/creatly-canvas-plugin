@@ -21,12 +21,8 @@
   ],
   "mcpServers": {
     "yuanji": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        "${CLAUDE_PLUGIN_ROOT}/mcp/canvas-mcp.cjs"
-      ],
-      "tool_timeout_sec": 1200
+      "type": "http",
+      "url": "https://dev.yuanji.studio/api/agent/mcp/v2"
     }
   },
   "defaultEnabled": false

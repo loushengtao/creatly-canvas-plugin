@@ -6,4 +6,4 @@ dependencies:
   tools:
     - type: mcp
       value: yuanji
-      description: 当前发行版本配置的本地画布 MCP 适配器
+      description: dev 网站的远程标准 MCP 服务（OAuth）

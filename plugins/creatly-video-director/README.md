@@ -1,49 +1,48 @@
-# Creatly Canvas Plugin
+# Creatly Canvas Plugin · Dev
 
-通过另一套已经跑通的本地画布桥接调用 `/api/agent/mcp/tools` 与 `/api/agent/mcp/call`，直接使用当前画布 JSON。包含 film-narrative、film-cinematic-realism、film-creation 三个创作技能。
+本分支通过远程 MCP 直接连接 [元极开发站点](https://dev.yuanji.studio/)，无需启动本地画布服务。
 
-## 运行条件
-
-- Node.js 22 或更新版本，安装宿主能从 PATH 找到 `node`。
-- 本机运行支持 canvas bridge 的 creatly-fe（`pnpm dev:canvas`），并保持一个已登录画布页面打开。
-- 默认连接 `http://127.0.0.1:3000`；自定义本地端口通过启动宿主时的 `YUANJI_CANVAS_URL` 环境变量设置。
-- 这是本地桥接插件；仅登录线上网站不够。后端环境由前端配置决定，安装插件不会切换测试或生产环境。
-
-插件带有自包含的 `mcp/canvas-mcp.cjs`，安装后不需要 npm install，也不需要 creatly-agent 服务。首次使用先 `canvas_status`，再 `canvas_describe_tools`。多页面时指定 clientId，工具定义从所选页面的实际后端发现。
-
-## JSON 与工具
-
-业务调用使用外层 projectId/baseVersion 等上下文与内层 payload。getCanvasContext 原样返回后端业务 JSON，大整数转成字符串；不会生成另一份可写 Film DSL。简单摘要可从结果整理，详细读取仅在后端实际提供时调用。本次没有新增后端 getCanvasDetail 接口。
-
-工具数量由实时 `/tools` 决定，插件另提供三个连接/发现辅助工具。当前后端缺少的工具不会以静态目录冒充可用能力。未指定生图模型时默认 Creatly Sigma 2.5 Sunburst 2K（`model=gpt-image-2.5-sunburst`、`function=gpt25_sunburst`、`modelConfigId=image_gpt25_sunburst`、`resolution=2k`）。用户明确指定的模型和参数优先；提交前核对当前配置，模型不可用时说明原因，不自动替换。节点配置、费用估算与生成请求参数必须一致。
-
-## 安装
-
-发布目录的根 README 提供 GitHub marketplace 安装命令。维护者可进入 `mcp/` 目录，执行 `npm ci`、`npm run build` 重建适配器，再执行 `npm run smoke` 做只读连接检查。
-
-Codex 使用 `.mcp.json` 的 `${PLUGIN_ROOT}`；Claude Code 使用 `.mcp.claude.json`，WorkBuddy 使用内联配置 的 `${CLAUDE_PLUGIN_ROOT}`。需要支持插件路径变量的宿主版本。
-
-## 验证与安全边界
-
-在 `mcp/` 目录运行 `npm run smoke` 仅做初始化、连接状态和工具发现，不创建节点、不触发生成。前端未连接时会失败并给出诊断。
-
-复用本机 bridge.token 和浏览器登录态；不打包凭据、不发送 token 到远程地址。适配器没有自动写入重试，超时须先读取原任务状态。长时间媒体任务用后端任务 ID 查询，MCP 工具超时不等于任务失败。
-
-## 构建来源
-
-MCP 适配器移植自 creatly-fe/scripts/canvas-mcp 的已验证流程。插件维护自己的可分发版本；不修改另一个任务运行中的 FE 或 Sky 服务。创作技能与执行说明随插件保存在 `skills/`。后端任务发布、节点状态同步和埋点等修复仍属于后端，插件不会代替或覆盖这些服务端改动。
-
-## 脚本调用
-
-需要从本地脚本调用时，统一使用插件自带入口，不再依赖前端仓库的 `scripts/canvas-mcp/call.ts`：
+## Codex 安装
 
 ```bash
-node /absolute/path/to/creatly-video-director/mcp/canvas-call.cjs canvas_status '{}'
-node /absolute/path/to/creatly-video-director/mcp/canvas-call.cjs getCanvasContext '{"clientId":"<页面 ID>","projectId":"<项目 ID>","payload":{}}'
-# 大参数可通过 stdin 传入
-node /absolute/path/to/creatly-video-director/mcp/canvas-call.cjs getCanvasContext - < request.json
+codex plugin marketplace add https://github.com/loushengtao/creatly-canvas-plugin.git --ref dev
+codex plugin add creatly-video-director@creatly
 ```
 
-每次业务调用会在同一个 MCP 会话中先检查登录页面、实时发现工具，再调用业务工具。多个已登录页面必须显式指定 `clientId`。ID 和版本号使用字符串。失败时退出码非零，不自动重试写入。
+安装后开启新任务，在宿主提示的 dev 网站授权页面登录并确认账号与空间。单纯打开网站不等于完成插件授权。已安装其他分支时先在宿主中移除旧的 creatly marketplace 来源，再添加 dev，避免同名来源仍指向旧分支。
 
-维护者运行 `npm test` 会重建两个入口并验证工具发现、页面选择、精确 ID 和写入不重试；测试使用模拟桥接，不触发真实生成。
+## Claude Code 安装
+
+```text
+/plugin marketplace add https://github.com/loushengtao/creatly-canvas-plugin.git#dev
+/plugin install creatly-video-director@creatly
+```
+
+使用 `/mcp` 完成 yuanji 的 OAuth 授权。WorkBuddy 用户可下载本仓库 dev 分支源码 ZIP，按宿主的本地 marketplace 安装流程导入；宿主需支持 HTTP MCP 与 OAuth，未完成端到端兼容验证。
+
+## CLI / 手动 MCP 配置
+
+```bash
+codex mcp add creatly-dev --url https://dev.yuanji.studio/api/agent/mcp/v2
+codex mcp login creatly-dev
+```
+
+手动 MCP 配置可独立测试连接，不包含插件创作技能。已通过插件连接时无需重复添加。
+
+## 创作
+
+三个技能共用远程连接：`film-narrative`（叙事短片）、`film-cinematic-realism`（写实电影）、`film-creation`（已有任务）。默认生图模型为 **Creatly Sigma 2.5 Sunburst、2K**，用户明确指定的参数优先。
+
+安装后可说：“使用 film-narrative，在 dev 站点创建一个短片项目，先完善剧本与人物设定；生成前告诉我预计费用。”
+
+## 环境与协议
+
+- 本分支 `dev` 固定连接 `https://dev.yuanji.studio/api/agent/mcp/v2`。
+- Codex、Claude Code 和 WorkBuddy 配置统一使用 HTTP MCP；认证令牌由宿主管理，不打包凭据。
+- 通过 `tools/list` 获取当前工具和 Schema，参数平铺，不使用旧本地 clientId/payload 包装。具体见 [执行协议](skills/film-creation/references/mcp-execution.md)。
+- 仓库 `mcp/` 中原有本地 stdio 适配器作为旧开发工具保留，但本分支插件不加载它；它不能当作远程 CLI 使用。
+- main 仍保留此前发布的版本。未来生产发布必须显式配置并验证生产站点，不把 dev 地址当作生产地址。
+
+## 验证
+
+开发站点的 OAuth 元数据返回 200，未授权 MCP 请求返回 401 并提供正确的授权发现地址。已通过 Codex 完成 OAuth 登录并发现 19 个远程工具，包括项目、画布、模型查询和生成工具。尚未执行付费生成，工具发现不等于生图验收。
