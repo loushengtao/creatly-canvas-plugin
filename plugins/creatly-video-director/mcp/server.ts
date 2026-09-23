@@ -9,7 +9,7 @@ const readOnly = new Set(['getCanvasContext', 'getConversationContext', 'listCan
 const clientProperty = { type: 'string', description: 'canvas_status 返回的页面 clientId；多页面时必须指定。' }
 const idProperty = { type: 'string', description: 'ID 必须使用字符串以保留 Java Long 精度。' }
 
-const imageModelPreference = '未指定生图模型时默认 Creatly Sigma 2.5 Flare（model=gpt-image-2.5-flare、function=gpt25_flare）；用户明确指定的模型、分辨率、质量和数量优先，例如 Sunburst 2K。提交前核对当前模型配置，并将节点配置、费用估算和 requests 参数保持一致。模型不可用时说明原因，不自动换模型或重生成。'
+const imageModelPreference = '未指定生图模型时默认 Creatly Sigma 2.5 Sunburst 2K（model=gpt-image-2.5-sunburst、function=gpt25_sunburst、modelConfigId=image_gpt25_sunburst、resolution=2k）；用户明确指定的模型、分辨率、质量和数量优先。提交前核对当前模型配置，并将节点配置、费用估算和 requests 参数保持一致。模型不可用时说明原因，不自动换模型或重生成。'
 
 export function createCanvasMcp(rpc: BridgeRpc) {
   const definitions = new Map<string, Record<string, unknown>>()

@@ -15,7 +15,7 @@
 
 业务调用使用外层 projectId/baseVersion 等上下文与内层 payload。getCanvasContext 原样返回后端业务 JSON，大整数转成字符串；不会生成另一份可写 Film DSL。简单摘要可从结果整理，详细读取仅在后端实际提供时调用。本次没有新增后端 getCanvasDetail 接口。
 
-工具数量由实时 `/tools` 决定，插件另提供三个连接/发现辅助工具。当前后端缺少的工具不会以静态目录冒充可用能力。未指定生图模型时默认 Creatly Sigma 2.5 Flare（`model=gpt-image-2.5-flare`、`function=gpt25_flare`）。用户明确指定的模型和参数优先，例如 Sunburst 2K；提交前核对当前配置，模型不可用时说明原因，不自动替换。节点配置、费用估算与生成请求参数必须一致。
+工具数量由实时 `/tools` 决定，插件另提供三个连接/发现辅助工具。当前后端缺少的工具不会以静态目录冒充可用能力。未指定生图模型时默认 Creatly Sigma 2.5 Sunburst 2K（`model=gpt-image-2.5-sunburst`、`function=gpt25_sunburst`、`modelConfigId=image_gpt25_sunburst`、`resolution=2k`）。用户明确指定的模型和参数优先；提交前核对当前配置，模型不可用时说明原因，不自动替换。节点配置、费用估算与生成请求参数必须一致。
 
 ## 安装
 
