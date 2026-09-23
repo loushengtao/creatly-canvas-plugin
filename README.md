@@ -53,6 +53,6 @@ WorkBuddy 支持把 creatly-video-director-local.zip 添加为本地 marketplace
 
 ## 更新
 
-适配器源码与独立构建脚本位于 plugins/creatly-video-director/mcp；修改后在该目录执行 npm ci 和 npm run build。发布前使用提供的只读 smoke 脚本检查本地连接。
+适配器源码与独立构建脚本位于 plugins/creatly-video-director/mcp；修改后在该目录执行 `npm ci` 和 `npm test`（包含构建与模拟桥接测试）。发布前执行 `npm run smoke` 做只读连接检查。脚本调用使用插件自带的 `mcp/canvas-call.cjs`，无需依赖前端源码；具体参数见完整插件说明。
 
 从同一个 marketplace 更新插件后重新加载或开启新任务。源码中的工具由后端实时发现；getCanvasContext 返回后端实际 JSON，尚未部署的详细画布接口不由插件伪造。

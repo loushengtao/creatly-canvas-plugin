@@ -9,12 +9,14 @@ const readOnly = new Set(['getCanvasContext', 'getConversationContext', 'listCan
 const clientProperty = { type: 'string', description: 'canvas_status 返回的页面 clientId；多页面时必须指定。' }
 const idProperty = { type: 'string', description: 'ID 必须使用字符串以保留 Java Long 精度。' }
 
+const imageModelPreference = '未指定生图模型时默认 Creatly Sigma 2.5 Sunburst 2K（model=gpt-image-2.5-sunburst、function=gpt25_sunburst、modelConfigId=image_gpt25_sunburst、resolution=2k）；用户明确指定的模型、分辨率、质量和数量优先。提交前核对当前模型配置，并将节点配置、费用估算和 requests 参数保持一致。模型不可用时说明原因，不自动换模型或重生成。'
+
 export function createCanvasMcp(rpc: BridgeRpc) {
   const definitions = new Map<string, Record<string, unknown>>()
   let catalogClientId: string | undefined
   const server = new Server({ name: 'yuanji-canvas', version: '1.0.0' }, {
     capabilities: { tools: { listChanged: true } },
-    instructions: `操作前先调用 canvas_status 确认 backend 和目标页面，再调用 canvas_describe_tools 获取真实后端 payload schema。本机桥接使用浏览器已登录账号，数据保存在显示的后端环境。ID 一律传字符串；修改前读取画布及版本，优先提供 baseVersion。生成可能收费，遵循用户授权和后端确认流程。超时后先读状态，禁止自动重试写操作。个人画布修改后可能需要手动刷新页面。`,
+    instructions: `操作前先调用 canvas_status 确认 backend 和目标页面，再调用 canvas_describe_tools 获取真实后端 payload schema。本机桥接使用浏览器已登录账号，数据保存在显示的后端环境。ID 一律传字符串；修改前读取画布及版本，优先提供 baseVersion。生成可能收费，遵循用户授权和后端确认流程。超时后先读状态，禁止自动重试写操作。个人画布修改后可能需要手动刷新页面。${imageModelPreference}`,
   })
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -24,7 +26,7 @@ export function createCanvasMcp(rpc: BridgeRpc) {
       { name: 'canvas_list_projects', description: '列出当前登录账号的项目。', inputSchema: { type: 'object' as const, properties: { clientId: clientProperty, page: { type: 'integer', minimum: 0 }, size: { type: 'integer', minimum: 1, maximum: 100 } }, additionalProperties: false }, annotations: { readOnlyHint: true } },
       ...Array.from(definitions).map(([name, definition]) => ({
         name,
-        description: `${definition.description}。先 canvas_describe_tools(toolName="${name}") 查询 payload schema。`,
+        description: `${definition.description}。先 canvas_describe_tools(toolName="${name}") 查询 payload schema。${name === 'batchGenerateImage' ? imageModelPreference : ''}`,
         inputSchema: {
           type: 'object' as const,
           properties: {
