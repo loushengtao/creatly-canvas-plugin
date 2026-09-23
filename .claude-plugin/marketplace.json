@@ -1,0 +1,22 @@
+{
+  "name": "creatly",
+  "metadata": {
+    "description": "Official Creatly plugins for creative production workflows."
+  },
+  "owner": {
+    "name": "Creatly"
+  },
+  "plugins": [
+    {
+      "name": "creatly-video-director",
+      "description": "Create and revise short films on the Creatly canvas.",
+      "version": "0.1.0+codex.20260923073858",
+      "author": {
+        "name": "Creatly"
+      },
+      "category": "design",
+      "source": "./plugins/creatly-video-director",
+      "homepage": "https://yuanji.studio"
+    }
+  ]
+}

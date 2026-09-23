@@ -1,0 +1,36 @@
+{
+  "name": "creatly-video-director",
+  "version": "0.1.0+codex.20260923073858",
+  "description": "Create and revise short films on the Creatly canvas.",
+  "author": {
+    "name": "Creatly",
+    "url": "https://yuanji.studio"
+  },
+  "homepage": "https://yuanji.studio",
+  "keywords": [
+    "film",
+    "video",
+    "storyboard",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Creatly Video Director",
+    "shortDescription": "\u53d9\u4e8b\u77ed\u7247\u4e0e\u5199\u5b9e\u7535\u5f71\u521b\u4f5c",
+    "longDescription": "Plan scripts and storyboards, create canvas nodes, generate media with explicit payment confirmation, and assemble a final preview through the Creatly MCP server.",
+    "developerName": "Creatly",
+    "category": "Creative Tools",
+    "capabilities": [
+      "Read",
+      "Write",
+      "Interactive"
+    ],
+    "websiteURL": "https://yuanji.studio",
+    "brandColor": "#E5484D",
+    "defaultPrompt": [
+      "\u4f7f\u7528 $film-narrative \u628a\u8fd9\u4e2a\u6545\u4e8b\u505a\u6210\u53d9\u4e8b\u77ed\u7247\u3002",
+      "\u4f7f\u7528 $film-cinematic-realism \u5236\u4f5c\u8fd9\u90e8\u5199\u5b9e\u7535\u5f71\uff0c\u4fdd\u6301\u89d2\u8272\u3001\u573a\u666f\u548c\u955c\u5934\u8fde\u8d2f\u3002"
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}
