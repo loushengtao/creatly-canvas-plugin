@@ -6,9 +6,12 @@ import { build } from 'esbuild'
 
 async function main() {
   const root = dirname(fileURLToPath(import.meta.url))
-  const result = await build({ entryPoints: [resolve(root, 'main.ts')], outfile: resolve(root, 'canvas-mcp.cjs'), bundle: true, platform: 'node', format: 'cjs', target: 'node22', minify: true, legalComments: 'eof', metafile: true })
+  const results = []
+  for (const [entry, output] of [['main.ts', 'canvas-mcp.cjs'], ['call.ts', 'canvas-call.cjs']]) {
+    results.push(await build({ entryPoints: [resolve(root, entry)], outfile: resolve(root, output), bundle: true, platform: 'node', format: 'cjs', target: 'node22', minify: true, legalComments: 'eof', metafile: true }))
+  }
   const notices = new Map()
-  for (const input of Object.keys(result.metafile.inputs).filter(path => path.includes('node_modules/'))) {
+  for (const input of [...new Set(results.flatMap(result => Object.keys(result.metafile.inputs)))].filter(path => path.includes('node_modules/'))) {
     let directory = dirname(resolve(input))
     while (dirname(directory) !== directory) {
       const manifest = resolve(directory, 'package.json')

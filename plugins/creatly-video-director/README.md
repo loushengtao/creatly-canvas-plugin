@@ -15,7 +15,7 @@
 
 业务调用使用外层 projectId/baseVersion 等上下文与内层 payload。getCanvasContext 原样返回后端业务 JSON，大整数转成字符串；不会生成另一份可写 Film DSL。简单摘要可从结果整理，详细读取仅在后端实际提供时调用。本次没有新增后端 getCanvasDetail 接口。
 
-工具数量由实时 `/tools` 决定，插件另提供三个连接/发现辅助工具。当前后端缺少的工具不会以静态目录冒充可用能力。模型不强制固定，遵循用户选择和实际 Schema。
+工具数量由实时 `/tools` 决定，插件另提供三个连接/发现辅助工具。当前后端缺少的工具不会以静态目录冒充可用能力。未指定生图模型时默认 Creatly Sigma 2.5 Flare（`model=gpt-image-2.5-flare`、`function=gpt25_flare`）。用户明确指定的模型和参数优先，例如 Sunburst 2K；提交前核对当前配置，模型不可用时说明原因，不自动替换。节点配置、费用估算与生成请求参数必须一致。
 
 ## 安装
 
@@ -25,10 +25,25 @@ Codex 使用 `.mcp.json` 的 `${PLUGIN_ROOT}`；Claude Code 使用 `.mcp.claude.
 
 ## 验证与安全边界
 
-`npm run plugin:check:mcp` 仅做初始化、连接状态和工具发现，不创建节点、不触发生成。前端未连接时会失败并给出诊断。
+在 `mcp/` 目录运行 `npm run smoke` 仅做初始化、连接状态和工具发现，不创建节点、不触发生成。前端未连接时会失败并给出诊断。
 
 复用本机 bridge.token 和浏览器登录态；不打包凭据、不发送 token 到远程地址。适配器没有自动写入重试，超时须先读取原任务状态。长时间媒体任务用后端任务 ID 查询，MCP 工具超时不等于任务失败。
 
 ## 构建来源
 
-MCP 适配器移植自 creatly-fe/scripts/canvas-mcp 的已验证流程。插件维护自己的可分发版本；不修改另一个任务运行中的 FE 或 Sky 服务。创作方法来自本仓库 Film Product，执行说明由 host/ 管理，skills/ 由投影脚本生成。
+MCP 适配器移植自 creatly-fe/scripts/canvas-mcp 的已验证流程。插件维护自己的可分发版本；不修改另一个任务运行中的 FE 或 Sky 服务。创作技能与执行说明随插件保存在 `skills/`。后端任务发布、节点状态同步和埋点等修复仍属于后端，插件不会代替或覆盖这些服务端改动。
+
+## 脚本调用
+
+需要从本地脚本调用时，统一使用插件自带入口，不再依赖前端仓库的 `scripts/canvas-mcp/call.ts`：
+
+```bash
+node /absolute/path/to/creatly-video-director/mcp/canvas-call.cjs canvas_status '{}'
+node /absolute/path/to/creatly-video-director/mcp/canvas-call.cjs getCanvasContext '{"clientId":"<页面 ID>","projectId":"<项目 ID>","payload":{}}'
+# 大参数可通过 stdin 传入
+node /absolute/path/to/creatly-video-director/mcp/canvas-call.cjs getCanvasContext - < request.json
+```
+
+每次业务调用会在同一个 MCP 会话中先检查登录页面、实时发现工具，再调用业务工具。多个已登录页面必须显式指定 `clientId`。ID 和版本号使用字符串。失败时退出码非零，不自动重试写入。
+
+维护者运行 `npm test` 会重建两个入口并验证工具发现、页面选择、精确 ID 和写入不重试；测试使用模拟桥接，不触发真实生成。
