@@ -46,3 +46,7 @@ codex mcp login creatly-dev
 ## 验证
 
 开发站点的 OAuth 元数据返回 200，未授权 MCP 请求返回 401 并提供正确的授权发现地址。已通过 Codex 完成 OAuth 登录并发现 19 个远程工具，包括项目、画布、模型查询和生成工具。尚未执行付费生成，工具发现不等于生图验收。
+
+## 图片、视频、音频上传
+
+配套后端部署后，使用 `prepareFileUpload` 与 `completeFileUpload` 上传本地参考素材，不依赖浏览器交接。操作和限制见 [媒体上传说明](scripts/README.md)。
