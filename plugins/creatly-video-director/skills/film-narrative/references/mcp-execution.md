@@ -28,10 +28,12 @@
 
 ## 本地参考素材上传
 
-先通过实时工具目录确认 `upload` 已部署。使用插件 [本地上传脚本](../../../scripts/README.md)：本机计算文件元信息 → `upload(action="prepare")` → 本机按返回 URL/headers 直传原文件 → `upload(action="complete")` → 用返回的真实 `fileRef` 绑定节点并读回。支持图片、视频、音频和文本（txt/md）。媒体完成后用 referenceResource 绑定；文本只返回 fileRef，读取正文后用 createNode(type="text", content=正文) 直接展示，不把文本文件当图片参考。不通过浏览器交接完成上传，不把本地路径冒充远程资源 ID，不把 Base64 放入工具参数。签名 URL 只存私有临时文件，上传或登记超时先核对原 uploadId，不能自动重投或付费生成。宿主没有本地文件传输能力时明确说明缺口。
+先通过实时工具目录确认 `upload` 已部署。使用插件 [本地上传脚本](../../../scripts/README.md)：本机计算文件元信息 → `upload(action="prepare")` → 本机按返回 URL/headers 直传原文件 → `upload(action="complete")` → 用返回的真实 `fileRef` 绑定节点并读回。支持图片、视频、音频和文本（txt/md）。媒体作为生成输入时用 referenceResource 绑定；文本只返回 fileRef，读取正文后用 createNode(type="text", content=正文) 直接展示，不把文本文件当图片参考。不通过浏览器交接完成上传，不把本地路径冒充远程资源 ID，不把 Base64 放入工具参数。签名 URL 只存私有临时文件，上传或登记超时先核对原 uploadId，不能自动重投或付费生成。宿主没有本地文件传输能力时明确说明缺口。
 
 ## 精简工具目录
 
 默认最多 13 个工具：listProjects、projectCreate、getCanvasContext、createNode、updateNode、deleteNodes、createSubject、upload、listGenerationModels、listSystemVoices、calculateCredits、generateNodes、getGenerationStatus。以实时 tools/list 为准，生成能力可能关闭。createSubject(kind="character"|"scene") 建立人物/场景主体结构，不自动生成。删除一个或多个节点都使用 deleteNodes，在用户指定的删除范围内直接执行，无需网页确认或 confirmOperation。先读取目标 deletion 观察并传入 expectedDeletions，重试沿用原参数及幂等键。
 
 节点连线使用 createNode/updateNode 的 parentIds：给 B 设置 parentIds=[A的ID] 建立 A → B。该字段替换完整输入列表，追加时保留已有 ID，[] 清空；parentNode 仅表示嵌套归属。需要指定参考图、首尾帧或音视频用途时同步设置 generationParams.referenceResources。
+
+已上传配音需要作为节点自身播放文件时，使用 updateNode(nodes=[{nodeId, fileRef:{id:上传回执.fileRef.id}}])；20 条可一次批量挂载，按最新画布提供 expectedNodeStates 和幂等键。也可 createNode(nodes=[{clientRef,type:"audio",label,fileRef:{id}}]) 直接建可播放音频节点，此时 content 可省略。fileRef 仅传 id，目前只支持 audio，会替换当前播放文件。不重传已有文件，不调用 generateNodes 或 TTS；挂载后用 getCanvasContext 检查 audioFiles。仅用 SOURCE_AUDIO 参考或连线不会将文件挂成节点自身音频。以实时 Schema 含 fileRef 为前提，旧后端需要先部署更新。

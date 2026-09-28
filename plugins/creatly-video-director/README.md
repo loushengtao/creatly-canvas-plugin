@@ -60,3 +60,7 @@ codex mcp login creatly-dev
 上传统一走 `upload`：`action="prepare"` 申请直传 → 本机上传原始字节 → `action="complete"` 登记。支持图片、视频、音频、文本（txt/md）；文本返回文件引用，需要在画布展示时再创建直接输入的文本节点。上传不自动发起生成。
 
 先部署对应后端，再升级插件并重新连接 MCP。旧后端不会因为安装插件自动获得新工具；实时 `tools/list` 才是能力依据。默认目录不再提供 Film DSL、浏览器交接、独立确认或 previewAssemble。
+
+### 0.2.1：已上传配音挂载
+
+后端支持节点级 fileRef 后，可通过 createNode/updateNode 将已上传音频直接挂成节点的可播放文件，无需 TTS 或重复上传。已有音频可批量更新；挂载后读回 audioFiles。先部署配套后端，再更新插件并刷新 MCP 工具目录。
