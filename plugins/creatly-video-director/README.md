@@ -49,4 +49,14 @@ codex mcp login creatly-dev
 
 ## 图片、视频、音频上传
 
-配套后端部署后，使用 `prepareFileUpload` 与 `completeFileUpload` 上传本地参考素材，不依赖浏览器交接。操作和限制见 [媒体上传说明](scripts/README.md)。
+配套后端部署后，使用统一的 `upload(action="prepare"|"complete")` 上传本地参考素材，不依赖浏览器交接。操作和限制见 [媒体上传说明](scripts/README.md)。
+
+## 0.2.0 精简工具目录
+
+新版后端默认提供 13 个工具（生成关闭时 12 个）：`listProjects`、`projectCreate`、`getCanvasContext`、`createNode`、`updateNode`、`deleteNodes`、`createSubject`、`upload`、`listGenerationModels`、`listSystemVoices`、`calculateCredits`、`generateNodes`、`getGenerationStatus`。
+
+`getCanvasContext` 默认 compact，需要生成配置等详细信息时传 `detail="full"`；主体列表合入 `subjects`。`createSubject` 用 `kind="character"|"scene"` 选择主体类型。
+
+上传统一走 `upload`：`action="prepare"` 申请直传 → 本机上传原始字节 → `action="complete"` 登记。支持图片、视频、音频、文本（txt/md）；文本返回文件引用，需要在画布展示时再创建直接输入的文本节点。上传不自动发起生成。
+
+先部署对应后端，再升级插件并重新连接 MCP。旧后端不会因为安装插件自动获得新工具；实时 `tools/list` 才是能力依据。默认目录不再提供 Film DSL、浏览器交接、独立确认或 previewAssemble。

@@ -17,7 +17,7 @@ class UploadTests(unittest.TestCase):
                                      'x-oss-forbid-overwrite': 'true'}}
 
     def test_inspects_all_three_media_without_reading_into_prompt(self):
-        for name, mime in [('a.png', 'image/png'), ('b.mp4', 'video/mp4'), ('c.wav', 'audio/wav')]:
+        for name, mime in [('a.png', 'image/png'), ('b.mp4', 'video/mp4'), ('c.wav', 'audio/wav'), ('d.txt', 'text/plain'), ('e.md', 'text/markdown')]:
             path = self.file.with_name(name)
             path.write_bytes(b'abc')
             self.assertEqual(inspect_file(path), {'filename': name, 'contentType': mime, 'sizeBytes': 3,
@@ -28,7 +28,7 @@ class UploadTests(unittest.TestCase):
         conn = constructor.return_value
         conn.getresponse.return_value.status = 200
         result = put_file(self.file, {'structuredContent': {'output': {'upload': self.manifest}}})
-        self.assertEqual(result, {'uploaded': True, 'uploadId': 'test', 'nextTool': 'completeFileUpload'})
+        self.assertEqual(result, {'uploaded': True, 'uploadId': 'test', 'nextTool': 'upload', 'arguments': {'action': 'complete', 'uploadId': 'test'}})
         conn.send.assert_called_once_with(b'abc')
         conn.putheader.assert_any_call('Content-MD5', 'kAFQmDzST7DWlj99KOF/cg==')
         conn.putheader.assert_any_call('Content-Length', '3')

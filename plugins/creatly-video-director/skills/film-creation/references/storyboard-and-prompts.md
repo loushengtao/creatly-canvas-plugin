@@ -156,7 +156,7 @@ Shot 的 `content` 使用易读文本保存这些字段，不要求把内部表�
 
 ## 主体引用准备
 
-写最终提示词前调用 `listCanvasSubjects`。建立精确映射：
+写最终提示词前调用 `getCanvasContext(includeSubjects=true)` 并读取 `subjects`。建立精确映射：
 
 ```text
 主体 Label -> 主体 ID -> subtype -> voiceProfileId（如有）

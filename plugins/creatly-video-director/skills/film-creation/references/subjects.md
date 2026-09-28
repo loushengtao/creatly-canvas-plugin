@@ -6,7 +6,7 @@
 
 ## 先读取已有主体
 
-调用 `listCanvasSubjects`，按以下三组检查：
+调用 `getCanvasContext(includeSubjects=true)` 并读取 `subjects`，按以下三组检查：
 
 ```text
 character
@@ -63,7 +63,7 @@ product
 
 ## 按 schema 选择角色音色
 
-先检查 `createCharacterSubject` 的实时 schema。只有 `voiceProfileId` 为必填，或本次任务明确需要为角色配置声音时，才调用 `listSystemVoices`：
+先检查 `createSubject(kind="character")` 的实时 schema。只有 `voiceProfileId` 为必填，或本次任务明确需要为角色配置声音时，才调用 `listSystemVoices`：
 
 1. 根据角色年龄、性别表达、气质和语言搜索；
 2. 从服务端结果中选择最匹配的音色；
@@ -126,9 +126,10 @@ no text, no watermark, no scene, no action
 
 ## 创建角色结构
 
-按实时 schema 调用 `createCharacterSubject`。核心结构为：
+按实时 schema 调用 `createSubject(kind="character")`。核心结构为：
 
 ```yaml
+kind: character
 label: 角色精确名称
 voiceProfileId: 服务端返回的真实音色 ID（schema 要求或本次需要时）
 frontView:
@@ -197,9 +198,10 @@ no people, no characters, no figures, empty scene, no text, no watermark
 
 ## 创建场景结构
 
-按实时 schema 调用 `createSceneSubject`，传入：
+按实时 schema 调用 `createSubject(kind="scene")`，传入：
 
 ```yaml
+kind: scene
 label: 场景精确名称
 sceneDescription: 面向编辑者的完整说明
 imagePrompt: 最终场景参考图提示词
@@ -268,9 +270,9 @@ nodes:
 }
 ```
 
-同一商品主体的破损、开启或污染状态使用额外子 Frame；已有商品主体使用真实 `parentNode`，同批新建使用 `parentNodeRef`。三视图使用 `parentIds` 或 `parentRefs` 依赖正视图，不能只靠提示词描述继承关系。写入后读取 FULL 快照，确认容器为 `type=element`、`subType=product`，基准 Frame 为 `type=frame`、`subType=front_view`，三视图为 `type=frame`、`subType=tri_view`，且所有参考 Frame 的 `parentNode` 指向该容器；再用 `listCanvasSubjects.product` 复核主体登记。
+同一商品主体的破损、开启或污染状态使用额外子 Frame；已有商品主体使用真实 `parentNode`，同批新建使用 `parentNodeRef`。三视图使用 `parentIds` 或 `parentRefs` 依赖正视图，不能只靠提示词描述继承关系。写入后读取 FULL 快照，确认容器为 `type=element`、`subType=product`，基准 Frame 为 `type=frame`、`subType=front_view`，三视图为 `type=frame`、`subType=tri_view`，且所有参考 Frame 的 `parentNode` 指向该容器；再用 `getCanvasContext` 返回的 `subjects.product` 复核主体登记。
 
-若实时 `createNode` schema 没有 `subType`，应报告「当前部署的 MCP 版本尚未开放商品主体子类型字段」，不能报告平台没有商品主体，也不能仅因缺少独立商品 Tool 而停止。需要三视图但 schema 未允许 `tri_view` 时，应明确报告「当前部署的 MCP 版本尚未开放商品三视图子类型」，不得退回创建无类型 Frame。此时仍不得调用 `createSceneSubject` 伪装商品主体，或把产品塞进无人场景参考图；依赖图片级商品一致性的生成等待 MCP 版本升级。
+若实时 `createNode` schema 没有 `subType`，应报告「当前部署的 MCP 版本尚未开放商品主体子类型字段」，不能报告平台没有商品主体，也不能仅因缺少独立商品 Tool 而停止。需要三视图但 schema 未允许 `tri_view` 时，应明确报告「当前部署的 MCP 版本尚未开放商品三视图子类型」，不得退回创建无类型 Frame。此时仍不得调用 `createSubject(kind="scene")` 伪装商品主体，或把产品塞进无人场景参考图；依赖图片级商品一致性的生成等待 MCP 版本升级。
 
 ## 生成主体参考图
 

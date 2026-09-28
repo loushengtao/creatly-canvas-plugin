@@ -15,6 +15,7 @@ MIME = {
     '.tif': 'image/tiff', '.tiff': 'image/tiff', '.mp4': 'video/mp4',
     '.mov': 'video/quicktime', '.avi': 'video/x-msvideo', '.mp3': 'audio/mpeg',
     '.wav': 'audio/wav', '.m4a': 'audio/mp4',
+    '.txt': 'text/plain', '.md': 'text/markdown',
 }
 
 
@@ -45,7 +46,7 @@ def find_upload(value):
 def put_file(path, manifest):
     upload = find_upload(manifest)
     if not upload or upload['method'] != 'PUT':
-        raise ValueError('Expected the prepareFileUpload JSON response')
+        raise ValueError('Expected the upload(action=prepare) JSON response')
     meta = inspect_file(path)
     headers = upload['headers']
     expected_md5 = base64.b64encode(bytes.fromhex(meta['md5'])).decode('ascii')
@@ -61,7 +62,7 @@ def put_file(path, manifest):
         raise ValueError('Expected an HTTPS Aliyun OSS upload URL')
     connection = http.client.HTTPSConnection(uri.hostname, timeout=120)
     try:
-        # No redirects or automatic retries: an uncertain PUT is checked via completeFileUpload.
+        # No redirects or automatic retries: an uncertain PUT is checked via upload(action=complete).
         connection.putrequest('PUT', uri.path + ('?' + uri.query if uri.query else ''))
         for key in ('Content-Type', 'Content-MD5', 'x-oss-forbid-overwrite'):
             connection.putheader(key, headers[key])
@@ -73,8 +74,8 @@ def put_file(path, manifest):
         response = connection.getresponse()
         response.read(8192)
         if response.status not in (200, 201):
-            raise ValueError(f'OSS returned HTTP {response.status}; check completeFileUpload before retrying')
-        return {'uploaded': True, 'uploadId': upload['uploadId'], 'nextTool': 'completeFileUpload'}
+            raise ValueError(f'OSS returned HTTP {response.status}; check upload(action=complete) before retrying')
+        return {'uploaded': True, 'uploadId': upload['uploadId'], 'nextTool': 'upload', 'arguments': {'action': 'complete', 'uploadId': upload['uploadId']}}
     finally:
         connection.close()
 
@@ -83,7 +84,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('operation', choices=('inspect', 'put'))
     parser.add_argument('file', type=Path)
-    parser.add_argument('--prepared', type=Path, help='Private JSON file containing prepareFileUpload result')
+    parser.add_argument('--prepared', type=Path, help='Private JSON file containing upload(action=prepare) result')
     args = parser.parse_args()
     if args.operation == 'inspect':
         result = inspect_file(args.file)
@@ -99,5 +100,5 @@ if __name__ == '__main__':
         main()
     except Exception as error:
         # Never print signed URLs, request headers or credentials.
-        print(str(error) if isinstance(error, ValueError) else f'Upload failed: {type(error).__name__}; check completeFileUpload before retrying', file=sys.stderr)
+        print(str(error) if isinstance(error, ValueError) else f'Upload failed: {type(error).__name__}; check upload(action=complete) before retrying', file=sys.stderr)
         sys.exit(1)
