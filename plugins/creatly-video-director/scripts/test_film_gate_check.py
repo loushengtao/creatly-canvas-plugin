@@ -51,6 +51,19 @@ class GateTests(unittest.TestCase):
     def test_id_style_mention_is_accepted(self):
         self.assertNotIn(('FAIL', 'unknown-subject'), gates(canvas(GOOD.replace('[@汤米]', '[@tom]'))))
 
+    def test_subject_library_alias_is_accepted(self):
+        nodes = canvas(GOOD.replace('[@汤米]', '[@6971856900043]'))
+        subjects = {'subjectTypes': [{'subjects': [{'id': '6971856900043', 'elementId': '7245778825357', 'label': '汤米'}]}]}
+        result = {(l, g) for l, g, _, _ in Checker(nodes, 30, 10, 30, set(), subjects).run()}
+        self.assertNotIn(('FAIL', 'unknown-subject'), result)
+
+    def test_encoded_mention_warns_and_card_line_counts(self):
+        token = 'dXmax4a7kW1Q1JdaDxIoE56ln0id1gAJ3NCrJsJE1z9FOdq6wokweKg'
+        result = gates(canvas(GOOD.replace('[@色卡]', f'[@{token}]')))
+        self.assertIn(('WARN', 'unverified-mention'), result)
+        self.assertNotIn(('FAIL', 'unknown-subject'), result)
+        self.assertNotIn(('FAIL', 'color-card-mention'), result)
+
     def test_unknown_subject_fails(self):
         self.assertIn(('FAIL', 'unknown-subject'), gates(canvas(GOOD + '[@波莉]')))
 
