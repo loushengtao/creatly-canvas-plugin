@@ -84,7 +84,7 @@ claude mcp add --transport http creatly-test https://test.yuanji.studio/api/agen
 
 ### 0.2.1：已上传配音挂载
 
-后端支持节点级 fileRef 后，可通过 createNode/updateNode 将已上传音频直接挂成节点的可播放文件，无需 TTS 或重复上传。已有音频可批量更新；挂载后读回 audioFiles。先部署配套后端，再更新插件并刷新 MCP 工具目录。
+后端支持节点级 fileRef 后，可通过 createNode/updateNode 将已上传的图片（frame）、视频（video）、音频（audio）直接挂成画布节点自身素材，效果同在画布拖入上传，无需生成或重复上传。已有节点可批量更新；挂载后读回 frameFiles/videoFiles/audioFiles。先部署配套后端，再更新插件并刷新 MCP 工具目录。
 
 ### 0.2.2：视频素材列表
 

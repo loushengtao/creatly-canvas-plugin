@@ -99,6 +99,6 @@ createSubject 返回 elementId、subjectNodeId、generationNodeIds 和 assetTask
 
 节点连线使用 createNode/updateNode 的 parentIds：给 B 设置 parentIds=[A的ID] 建立 A → B。该字段替换完整输入列表，追加时保留已有 ID，[] 清空；parentNode 仅表示嵌套归属。需要指定参考图、首尾帧或音视频用途时同步设置 generationParams.referenceResources。
 
-已上传配音需要作为节点自身播放文件时，使用 updateNode(nodes=[{nodeId, fileRef:{id:上传回执.fileRef.id}}])；20 条可一次批量挂载，按最新画布提供 expectedNodeStates 和幂等键。也可 createNode(nodes=[{clientRef,type:"audio",label,fileRef:{id}}]) 直接建可播放音频节点，此时 content 可省略。fileRef 仅传 id，目前只支持 audio，会替换当前播放文件。不重传已有文件，不调用 generateNodes 或 TTS；挂载后用 getCanvasContext 检查 audioFiles。仅用 SOURCE_AUDIO 参考或连线不会将文件挂成节点自身音频。以实时 Schema 含 fileRef 为前提，旧后端需要先部署更新。
+已上传的图片、视频、音频需要作为画布上的节点自身素材时（效果同在画布拖入上传），用 createNode(nodes=[{clientRef,type,label,fileRef:{id:上传回执.fileRef.id}}]) 新建，content 可省略：图片用 type="frame"、视频用 type="video"、音频用 type="audio"，文件类型须与节点类型一致；已有节点用 updateNode(nodes=[{nodeId, fileRef:{id}}]) 替换当前文件，多个节点可一次批量挂载，按最新画布提供 expectedNodeStates 和幂等键。fileRef 仅传 id；不重传已有文件，不调用 generateNodes 或 TTS，不扣费；挂载后用 getCanvasContext 检查 frameFiles/videoFiles/audioFiles。只放进 referenceResources 或连线不会把文件挂成节点自身素材，画布上也看不到。以实时 Schema 中 fileRef 的节点类型为准：旧后端只允许 audio，需要先部署更新。
 
 视频的输入按「视频参考素材（全能参考，强制）」准备：主体 `[@主体名]`，站位图和补充视角写 referenceResources，音频按顺序连线；正反打、补拍画面不作为视频参考。跨镜头参考时显式加入本镜 Shot 并传 nodeIndex，人物图本身无需 Shot。多图模式使用 generationParams.videoType="referenceImg"；需要精确编号时按提示词顺序写 referenceResources，图片用 IMAGE/REFERENCE，配音用 AUDIO/SOURCE_AUDIO，分别对应图1…和音频1…。不要再将“一张图/一条音频”或“人物/补拍图不能连视频”当成通用限制。生成仍需核对具体模型的素材数量、格式与时长要求。首尾帧 keyframe 模式与多图 referenceImg 模式区分使用。
