@@ -15,9 +15,7 @@
   ],
   "category": "design",
   "skills": [
-    "./skills/film-narrative",
-    "./skills/film-cinematic-realism",
-    "./skills/film-creation"
+    "./skills/film-skill"
   ],
   "mcpServers": {
     "yuanji": {

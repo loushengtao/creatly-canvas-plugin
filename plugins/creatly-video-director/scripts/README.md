@@ -29,3 +29,33 @@ python3 -m unittest discover -s scripts -p 'test_upload_file.py'
 ```
 
 支持 `.txt` (`text/plain`) 和 `.md` (`text/markdown`)，上限 5 MiB。文本登记返回 fileRef，不返回模型媒体参考；需要在画布显示时读取正文，再创建直接输入模式的文本节点。
+
+# 生成前门禁
+
+提交分镜或视频的 `generateNodes` 之前，先把 `getCanvasContext(detail="full")` 的结果存成 JSON，再运行：
+
+```bash
+python3 scripts/film_gate_check.py '/private/path/canvas.json' --nodes '<本批节点ID,逗号分隔>' --max-images 30
+```
+
+`--max-images` 取实时 `listGenerationModels` 返回的参考图上限。输出每行一条：`FAIL` 是强制关卡，有未豁免的 FAIL 时退出码为 1，不提交生成；`WARN` 只提示，在回复里说明即可。
+
+用户明确说跳过某项时，加 `--skip <关卡名>`，结果标为「用户豁免」，并在回复中点明跳过了什么。
+
+| 关卡 | 级别 | 检查内容 |
+| --- | --- | --- |
+| color-card / color-card-mention | FAIL | 色卡主体有图；分镜和视频提示词都 @ 了色卡 |
+| character-views | FAIL | 每个角色主体至少 3 个视角（三视图按 3 个计） |
+| subject-images | WARN | 主体库图片不随快照返回时，提醒到画布确认 |
+| unknown-subject / subject-edge | FAIL | @ 的主体存在（名称或 ID 都认）；主体不连线 |
+| group | FAIL | 分镜和视频已放进本镜组 |
+| ref-limit / ref-index | FAIL | 参考图、音频不超上限；【图N】【音频N】不超过实际传入数量 |
+| timing / duration-limit | FAIL | 镜头块从 0 开始、连续、总长等于节点时长；不超过模型最长时长 |
+| prompt-hygiene | FAIL | 提示词里没有本地路径或文件名 |
+| shot-frame-ref / blocking | WARN | 默认不垫镜头画面；应垫站位图 |
+| equal-durations / shot-length / hard-cut | WARN | 镜头时长错落、单镜 2–8 秒、镜头块之间有 HARD CUT |
+| axis / dialogue / music / standalone | WARN | 多人戏写轴线；台词与音频逐字一致；默认无配乐；不写「上一段」等依赖上下文的说法 |
+
+```bash
+python3 -m unittest discover -s scripts -p 'test_film_gate_check.py'
+```

@@ -1,6 +1,6 @@
 # 当前画布 JSON 契约
 
-接口 Schema 以 标准 MCP tools/list 从 dev 站点取得的定义为准。具体调用方式见 [MCP 执行协议](mcp-execution.md)。
+接口 Schema 以 标准 MCP tools/list 从插件配置的站点取得的定义为准。具体调用方式见 [MCP 执行协议](mcp-execution.md)。
 
 先读取 getCanvasContext，保留真实节点 ID、输入关系、容器关系、节点顺序、版本及媒体字段。缺失字段不代表空值，过滤读取不代表完整画布；删除或跨节点修订前须取得相关完整范围。
 
