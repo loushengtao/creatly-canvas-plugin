@@ -55,7 +55,7 @@ codex mcp login creatly-dev
 
 新版后端默认提供 13 个工具（生成关闭时 12 个）：`listProjects`、`projectCreate`、`getCanvasContext`、`createNode`、`updateNode`、`deleteNodes`、`createSubject`、`upload`、`listGenerationModels`、`listSystemVoices`、`calculateCredits`、`generateNodes`、`getGenerationStatus`。
 
-`getCanvasContext` 默认 compact，需要生成配置等详细信息时传 `detail="full"`；主体列表合入 `subjects`。`createSubject` 用 `kind="character"|"scene"` 选择主体类型。
+`getCanvasContext` 默认 compact，需要生成配置等详细信息时传 `detail="full"`；主体列表合入 `subjects`。`createSubject` 用 `kind="character"|"scene"|"prop"|"custom"` 选择主体类型，custom 使用实际分类 ID。
 
 上传统一走 `upload`：`action="prepare"` 申请直传 → 本机上传原始字节 → `action="complete"` 登记。支持图片、视频、音频、文本（txt/md）；文本返回文件引用，需要在画布展示时再创建直接输入的文本节点。上传不自动发起生成。
 
@@ -68,3 +68,11 @@ codex mcp login creatly-dev
 ### 0.2.2：视频素材列表
 
 配套后端支持多图片、多音频输入连线，人物正视图和跨镜头补拍图可作为视频参考。跨镜头引用时用显式 Shot 确定归属，多图采用 referenceImg，按素材顺序编写提示词编号。
+
+### 0.2.3：正式主体库
+
+`createSubject` 写入正式主体资产并应用到画布，支持人物、场景、道具及已有自定义分类。图片生成完成后自动归档主体素材。
+
+`getCanvasContext` 同时返回主体分类、资产列表和画布主体；full 模式包含参考项和文件，subjectId/subjectQuery 可精读或检索。`updateNode` 支持 generationParams.elementBindings；使用返回的 mentionToken 在图片或视频提示词中 @ 主体，无需连线，也可指定主体素材子集。
+
+需要部署配套主体库后端；插件刷新工具目录即可发现服务端参数，更新插件到 0.2.3 可获得新版调用说明。旧 triView 三视图参数仍兼容；新调用优先使用 threeView，造型使用 look。

@@ -166,6 +166,14 @@ Shot 的 `content` 使用易读文本保存这些字段，不要求把内部表�
 
 不要把内部 ID 写进可见提示词。ID 只放在实时 schema 支持的 `mentionElementIds` 或资源参数中。
 
+### 角色参考图（强制）
+
+Frame 与 Video 中出现的每个已建主体（角色、场景、色卡），都必须在提示词里用 `[@主体名]` 提及，由主体图锁定。主体不连线（不写进 `parentIds`），也不重复写进 `referenceResources`，保持画布清爽。角色正视图尚未生成时，先生成角色图。只靠文字描述身份视为未完成。详见 [MCP 执行协议](mcp-execution.md) 的「角色参考图（强制）」。
+
+### 色卡（强制）
+
+分镜 Frame 生成前先有本幕色卡图（暗部 / 中间调 / 高光三档色块 + HEX），做成色卡主体。每个 Frame 和 Video 的提示词加「【色卡】[@色卡] …」一行：只锁定色调、明暗比例和饱和度，不决定构图，并抄录关键 HEX；不连线、不写 referenceResources。详见 [MCP 执行协议](mcp-execution.md)「色卡（强制，分镜前完成）」。
+
 ## Frame 提示词
 
 Frame 是 Video 的 `t=0` 首帧。提示词描述动作尚未发生或刚刚启动的预备状态，不描述动作已经完成的终态。
@@ -183,6 +191,7 @@ Frame 是 Video 的 `t=0` 首帧。提示词描述动作尚未发生或刚刚启
 + [前景、中景、背景]
 + [关键道具]
 + [主光方向、色温、明暗关系]
++ [【色卡】[@色卡] 色调、明暗比例与关键 HEX]
 + [画质和一致性约束]
 + [必要负向约束]
 ```
@@ -287,7 +296,7 @@ Video 提示词从父 Frame 的首帧继续，重点描述时间变化。推荐�
 4. Frame 用 `parentRefs` 指向所属 Shot，`content` 保存最终图片提示词；
 5. Video 用 `parentRefs` 指向所属 Frame，`content` 保存最终视频提示词；其直接 Frame 父级必须收敛到唯一 Shot，并按该 Shot 内视频顺序提供 `nodeIndex`；
 6. Audio 按叙事归属用 `parentRefs` 指向 Shot；新建 Audio 只保存结构和内容，不表示已经具备生成配置；
-7. 每个新节点只提交实时 schema 正式暴露的字段；
+7. 每个新节点只提交实时 schema 正式暴露的字段；本批同时为每个 Shot 建一个组（`type=group`），把该镜的 Frame、Audio、Video 的 `parentNodeRef` 指向该组；
 8. 每批使用最新 FULL 快照的 `projectId` 和独立幂等键 `film:<projectId>:graph:scene-<NN>:create:v1` 原子写入；`baseVersion` 仅作可选冲突检查；
 9. 每批从 `structuredContent.output.createdNodes` 保存 `clientRef -> nodeId` 映射，再读取 FULL 快照验证当前 Scene 的完整关系；
 10. 先完成已创建试拍 Scene 的剩余镜头，再处理尚未创建的 Scene；当前制作中的 Scene 通过生成与视觉验收后，才编译和创建下一个 Scene。全部 Scene 完成后再读取一次 FULL 快照，验证完整作品。
@@ -306,6 +315,8 @@ Video 提示词从父 Frame 的首帧继续，重点描述时间变化。推荐�
 - Frame 是首帧预备状态；
 - Video 从该首帧自然发展；
 - 本批 `parentRefs` 或已有 `parentIds` 指向正确；
+- 本幕色卡主体已有图片，提示词含「【色卡】[@色卡]」行；
+- 本镜的分镜图、补拍图、音频和视频已放进本镜组；
 - 时长足够承载动作和对白；
 - 镜头卡已通过首帧占位、残留引用、空间、视线、物理、表演和复杂度审计；
 - 节点 `content` 已经提交到画布；其他必需生成配置可由服务端解析，或具有实时 schema 正式字段的写入证据。

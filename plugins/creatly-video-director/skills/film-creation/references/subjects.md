@@ -133,18 +133,14 @@ kind: character
 label: 角色精确名称
 voiceProfileId: 服务端返回的真实音色 ID（schema 要求或本次需要时）
 frontView:
-  type: frame
-  label: 正视图
   content: 最终正视图提示词
-triView:
-  type: frame
-  label: 三视图
+threeView:
   content: 最终三视图提示词
 ```
 
 生成与状态查询按 [MCP 执行协议](mcp-execution.md) 及实时工具定义执行；每次新付费范围独立确认，回读真实媒体文件。
 
-调用只创建主体和 Frame 结构，不自动生图。收集返回中的主体 ID、正视图 Frame ID 和三视图 Frame ID，并回读画布与主体列表。缺少任一必需结构时，该角色未准备完成。
+调用将正式主体写入资产库并建立画布应用节点与图片计划，不自动生图。分别保存 elementId（主体资产）、subjectNodeId（画布应用节点）以及 generationNodeIds（待生成图片）；生成后服务端自动归档主体素材，再用 getCanvasContext(detail="full", subjectId=elementId) 回读。缺少任一必需结构时，该角色未准备完成。
 
 ## 识别场景主体
 
