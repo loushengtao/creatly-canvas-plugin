@@ -24,9 +24,12 @@ PATH = re.compile(r'/Users/|[A-Za-z]:[\\/]|\S+\.(?:png|jpe?g|webp|mp4|mov|wav|mp
 CONTEXT_WORDS = ('上一段', '上一镜', '同上', '保持之前', '和前面一样', '如前所述')
 AXIS_WORDS = ('轴线', '画面左', '画面右', '画左', '画右')
 MUSIC = re.compile(r'(背景音乐|配乐|BGM)', re.I)
+OPAQUE_REF = re.compile(r'^[A-Za-z0-9_-]{32,}$')
+CARD_LINE = re.compile(r'【色卡】\s*\[@')
 
 
-def load_nodes(path):
+def load_canvas(path):
+    """返回 (nodes, subjects)。subjects 为快照里的主体库信息，可能不存在。"""
     with open(path, encoding='utf-8') as f:
         data = json.load(f)
     if isinstance(data, list):
@@ -39,7 +42,27 @@ def load_nodes(path):
     for key in ('structuredContent', 'output'):
         if isinstance(data, dict) and key in data and isinstance(data[key], dict):
             data = data[key]
-    return data['nodes']
+    return data['nodes'], data.get('subjects') or {}
+
+
+def load_nodes(path):
+    return load_canvas(path)[0]
+
+
+def subject_aliases(subjects):
+    """主体库里的 subject id / elementId → 主体名；兼容新旧两种快照格式。"""
+    groups = []
+    for t in subjects.get('subjectTypes') or []:
+        groups.extend(t.get('subjects') or [])
+    for key, value in subjects.items():
+        if key not in ('project', 'subjectTypes', 'unlinked') and isinstance(value, list):
+            groups.extend(value)
+    aliases = {}
+    for item in groups:
+        for ref in (item.get('id'), item.get('elementId')):
+            if ref and item.get('label'):
+                aliases[str(ref)] = item['label']
+    return aliases
 
 
 def norm(text):
@@ -52,7 +75,7 @@ def prompt_of(node):
 
 
 class Checker:
-    def __init__(self, nodes, max_images, max_audios, max_duration, skip):
+    def __init__(self, nodes, max_images, max_audios, max_duration, skip, subjects=None):
         self.nodes = nodes
         self.by = {n['id']: n for n in nodes}
         self.max_images, self.max_audios, self.max_duration = max_images, max_audios, max_duration
@@ -61,6 +84,9 @@ class Checker:
         self.elements = {n['label']: n for n in nodes if n['type'] == 'element'}
         self.element_by_ref = dict(self.elements)
         self.element_by_ref.update({e['id']: e for e in self.elements.values()})
+        for ref, label in subject_aliases(subjects or {}).items():
+            if label in self.elements:
+                self.element_by_ref[ref] = self.elements[label]
         self.subject_ids = set(e['id'] for e in self.elements.values())
         self.subject_ids |= {n['id'] for n in nodes if n.get('parentNode') in self.subject_ids}
         self.card = next((e for name, e in self.elements.items() if COLOR_CARD in name), None)
@@ -96,10 +122,15 @@ class Checker:
     def check_common(self, node):
         text = prompt_of(node)
         found, raw = self.mentions(text)
+        opaque = 0
         for element, name in zip(found, raw):
-            if element is None:
+            if element is None and OPAQUE_REF.match(name):
+                opaque += 1
+            elif element is None:
                 self.add(FAIL, 'unknown-subject', node, f'提及的主体 [@{name}] 不存在')
-        if self.card is not None and self.card not in found:
+        if opaque:
+            self.add(WARN, 'unverified-mention', node, f'{opaque} 处 @ 是站点保存后的编码 ID，脚本无法核对对应哪个主体，请在画布上确认')
+        if self.card is not None and self.card not in found and not CARD_LINE.search(text):
             self.add(FAIL, 'color-card-mention', node, f'提示词没有 [@{self.card["label"]}]')
         parent = self.by.get(node.get('parentNode') or '')
         if not parent or parent['type'] != 'group':
@@ -210,7 +241,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
     skip = {s.strip() for s in args.skip.split(',') if s.strip()}
     only = {s.strip() for s in args.nodes.split(',')} if args.nodes else None
-    results = Checker(load_nodes(args.canvas), args.max_images, args.max_audios, args.max_duration, skip).run(only)
+    nodes, subjects = load_canvas(args.canvas)
+    results = Checker(nodes, args.max_images, args.max_audios, args.max_duration, skip, subjects).run(only)
     fails = [r for r in results if r[0] == FAIL]
     if args.json:
         print(json.dumps([dict(zip(('level', 'gate', 'node', 'message'), r)) for r in results], ensure_ascii=False, indent=2))
