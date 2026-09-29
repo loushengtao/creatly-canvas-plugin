@@ -4,7 +4,7 @@
 
 本分支直接连接 `https://test.yuanji.studio/api/agent/mcp/v2`，使用标准 Streamable HTTP MCP 与 OAuth。无需本地画布服务、bridge.token 或保持浏览器画布打开。由宿主完成授权发现、浏览器登录、PKCE 和令牌刷新；不索取或复制用户密码、Cookie、Access Token，不使用本地桥接替代授权。
 
-首次使用按宿主提示打开 dev 网站完成授权，确认账号和空间。通过标准 MCP `tools/list` 获取当前部署的工具及完整 inputSchema；不要调用旧本地适配器独有的 `canvas_status`、`canvas_describe_tools` 或 `canvas_list_projects`。若宿主已发现工具，直接读取其最新定义。使用 `listProjects` 返回的 `authorizationContext` 核对账号和空间；创建项目的回执也包含该字段。
+首次使用按宿主提示打开插件配置的站点完成授权，确认账号和空间。通过标准 MCP `tools/list` 获取当前部署的工具及完整 inputSchema；不要调用旧本地适配器独有的 `canvas_status`、`canvas_describe_tools` 或 `canvas_list_projects`。若宿主已发现工具，直接读取其最新定义。使用 `listProjects` 返回的 `authorizationContext` 核对账号和空间；创建项目的回执也包含该字段。
 
 工具不可用、未授权或权限不足时给出实际错误，不能使用过期工具目录冒充连接成功。项目与模型目录通过当前实际工具查询。
 
@@ -36,12 +36,36 @@ createSubject 返回 elementId、subjectNodeId、generationNodeIds 和 assetTask
 
 凡是画面中出现已建角色的 Frame 或 Video，生成前必须垫该角色的参考图来固定身份，没有例外：
 
-1. 先有角色图：角色主体的正视图（必要时加三视图）必须已经生成并回读到非空 frameFiles。角色图还没生成时，先生成角色图，不生成依赖它的分镜或视频。用户提供了真人照片或剧照时，先用这些照片垫图生成角色正视图，再用正视图垫分镜。
-2. 用主体提及锁定，不连线：凡是涉及主体（角色、场景、色卡等）的 Frame 和 Video，都在提示词里用 `[@主体名]` 提及，系统据此建立正式 elementBindings 并带入主体素材；只有历史画布主体使用 mentionElementIds。主体不写进 `parentIds`，也不把主体图重复写进 referenceResources。Video 的 referenceResources 只放本镜分镜、补拍图和音频，提示词里原来的【图N】角色行改写成「[@角色名]：锁定的特征」，其余【图N】按新顺序重新编号。
+1. 先有角色图：角色主体至少 3 个视角（正视图 + 侧/背视图或三视图）必须已经生成并回读到非空 frameFiles。角色图还没生成时，先生成角色图，不生成依赖它的分镜或视频。用户提供了真人照片或剧照时，先用这些照片垫图生成角色正视图，再用正视图垫分镜。
+2. 用主体提及锁定，不连线：凡是涉及主体（角色、场景、色卡等）的 Frame 和 Video，都在提示词里用 `[@主体名]` 提及（画布保存后可能显示为 `[@主体ID]`，两种写法等价），系统据此建立正式 elementBindings 并带入主体素材；只有历史画布主体使用 mentionElementIds。主体不写进 `parentIds`，也不把主体图重复写进 referenceResources。Video 的 referenceResources 只放本镜分镜、补拍图和音频，提示词里原来的【图N】角色行改写成「[@角色名]：锁定的特征」，其余【图N】按新顺序重新编号。
 3. 每个出场角色各垫一张：双人或多人镜头要把每个出场角色的正视图都垫上；只露背影、肩膀或手的角色同样要垫，以锁定服装与发型。
 4. 提示词写明引用职责：说明每张参考图锁定什么（脸、发型、帽子、服装），并写明参考图不决定构图。
 5. 生成前回读核对：用 `getCanvasContext(detail="full")` 检查每个待生成节点的提示词都用 `[@角色名]` 提及了全部出场角色；缺任何一个就先补齐，不提交 generateNodes。
 6. 改角色图后传播：角色正视图重新生成后，列出所有引用它的分镜和视频，按用户确认的范围重生。
+
+## 视频参考素材（全能参考，强制）
+
+视频默认走全能参考（`videoType="referenceImg"`）：只垫资产，镜头关系写进提示词。
+
+1. 垫什么：
+   - 人物：每个出场角色至少 3 个视角（正视图 + 侧视图 / 背视图，或正视图 + 三视图）。角色主体里不足 3 个视角时，先补齐再出视频。
+   - 道具：本镜出现、需要跨镜一致的关键道具，各一张或多角度。
+   - 场景：本镜所在场景的空间图，覆盖本镜机位朝向（门窗、吧台、桌椅等地标可见）。
+   - 站位图：每个场景一张站位图（俯视或大全景），标出每个人的位置、朝向、关键道具和摄影机轴线；站位在场景中途改变时（如起身、离场），按状态各出一张，标题写成 `站位｜<场景>｜<状态>`。
+2. 不垫什么：正反打、过肩、补拍等镜头画面不作为视频参考；正反打、对白覆盖、机位切换全部写在提示词里。只有用户明确要求锁定构图或首尾帧时，才额外垫本镜分镜图（此时改用图片优先路线，并在回复中说明）。
+3. 有几张垫几张：在模型上限内尽量把上述资产垫全。上限以 `listGenerationModels(scene="video", modelIds=[...], detail="full")` 返回的 `scenarioCapabilities.multi_graph.rules.inputs.referenceImages.max` 为准（元极 Seedance 2.5 当前为 30 张图、10 条音频），不按经验值写死；超出上限时按「本镜出场人物 → 站位图 → 场景 → 道具」的优先级取舍。
+4. 怎么传：角色、场景、道具、色卡等主体在提示词里 `[@主体名]`，不连线；站位图和主体里没有的补充视角写进 `referenceResources`，不连线。生成前回读，核对实际传入张数与提示词里的【图N】编号一致；`@` 只带入主体主图时，把其余视角补进 referenceResources。
+5. 提示词里写清正反打：参考职责之后写「执行与连续性」，明确轴线（谁在画面左、谁在右）、屏幕方向、每个镜头块的景别与机位（如「正打，越过汤米右肩拍亚瑟」），镜头块之间独立一行 `HARD CUT`。
+
+## 强制关卡与用户自由度
+
+下面几项是默认强制关卡，不满足就不提交对应的 generateNodes：
+
+- 分镜前：色卡主体已有图片。
+- 视频前：本镜出场角色各有至少 3 个视角；有场景图和对应状态的站位图；提示词 `[@]` 了全部出场主体，并写清轴线和正反打；每个镜头的物料已放进本镜组。
+- 生成前：回读画布，把 `getCanvasContext(detail="full")` 存成 JSON，运行插件的 `scripts/film_gate_check.py`（用法见 scripts/README.md「生成前门禁」）；有未豁免的 FAIL 不提交 generateNodes。本批范围与费用已在对话中确认。
+
+用户可以对任一关卡明确说「跳过」或「这次不用」，照做即可（运行门禁时用 `--skip <关卡名>`）：在回复里点明跳过了哪一项、可能的影响，不反复劝阻。风格、景别、镜头数量、时长、垫图多少、是否先出分镜图等创作选择由用户决定，skill 只给默认值和建议，不替用户做硬性决定。
 
 ## 色卡（强制，分镜前完成）
 
@@ -62,8 +86,8 @@ createSubject 返回 elementId、subjectNodeId、generationNodeIds 和 assetTask
 - 每个 Shot 建一个 `type=group` 的组（`content` 不能为空，可填组名），把该镜的分镜图、补拍图、音频和视频的 `parentNode` 设为该组；Shot 与 Scene 的结构归属来自 `parentIds` 连线和 nodeIndex，改 parentNode 不影响结构。
 - 风格参考（剧照复刻）单独建一个组；色卡、角色、场景做成主体，放在同一排。过时版本直接用 deleteNodes 删除，不留存档区。
 - `position` 相对于 `parentNode` 计算：组内子节点写相对坐标（建议从 (20, 46) 起，给组标题留出空间），组本身写绝对坐标。通过 MCP 写入不会自动适配尺寸，必须给组写 `dimensions`，否则只显示 284×160。
-- 组内固定列：分镜图 → 音频列（每条 260×56，间距 72）→ 视频 → 补拍图，音频和图片不重叠。
-- 连线只保留结构和生成必需的：Frame → 本镜 Shot；Video ← 本镜 Frame、补拍图、音频。所有主体都不连线，只在提示词里 `[@主体名]`。
+- 组内固定列：分镜图 → 音频列（每条 260×56，间距 72）→ 视频 → 补拍图，音频和图片不重叠。站位图放在对应场景主体旁或「风格参考」组里，跨镜复用。
+- 连线只保留结构和生成必需的：Frame → 本镜 Shot；Video ← 本镜 Frame（归属用）、音频。所有主体都不连线，只在提示词里 `[@主体名]`。
 
 ## 本地参考素材上传
 
@@ -77,4 +101,4 @@ createSubject 返回 elementId、subjectNodeId、generationNodeIds 和 assetTask
 
 已上传配音需要作为节点自身播放文件时，使用 updateNode(nodes=[{nodeId, fileRef:{id:上传回执.fileRef.id}}])；20 条可一次批量挂载，按最新画布提供 expectedNodeStates 和幂等键。也可 createNode(nodes=[{clientRef,type:"audio",label,fileRef:{id}}]) 直接建可播放音频节点，此时 content 可省略。fileRef 仅传 id，目前只支持 audio，会替换当前播放文件。不重传已有文件，不调用 generateNodes 或 TTS；挂载后用 getCanvasContext 检查 audioFiles。仅用 SOURCE_AUDIO 参考或连线不会将文件挂成节点自身音频。以实时 Schema 含 fileRef 为前提，旧后端需要先部署更新。
 
-视频可以连接多张分镜、补拍图以及多条音频，统一传入有序 parentIds 列表；角色、色卡等主体一律在提示词里 `[@主体名]`，不连线、不写 referenceResources。跨镜头参考时显式加入本镜 Shot 并传 nodeIndex，人物图本身无需 Shot。多图模式使用 generationParams.videoType="referenceImg"；需要精确编号时按提示词顺序写 referenceResources，图片用 IMAGE/REFERENCE，配音用 AUDIO/SOURCE_AUDIO，分别对应图1…和音频1…。不要再将“一张图/一条音频”或“人物/补拍图不能连视频”当成通用限制。生成仍需核对具体模型的素材数量、格式与时长要求。首尾帧 keyframe 模式与多图 referenceImg 模式区分使用。
+视频的输入按「视频参考素材（全能参考，强制）」准备：主体 `[@主体名]`，站位图和补充视角写 referenceResources，音频按顺序连线；正反打、补拍画面不作为视频参考。跨镜头参考时显式加入本镜 Shot 并传 nodeIndex，人物图本身无需 Shot。多图模式使用 generationParams.videoType="referenceImg"；需要精确编号时按提示词顺序写 referenceResources，图片用 IMAGE/REFERENCE，配音用 AUDIO/SOURCE_AUDIO，分别对应图1…和音频1…。不要再将“一张图/一条音频”或“人物/补拍图不能连视频”当成通用限制。生成仍需核对具体模型的素材数量、格式与时长要求。首尾帧 keyframe 模式与多图 referenceImg 模式区分使用。
