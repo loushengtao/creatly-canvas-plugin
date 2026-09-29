@@ -1,12 +1,12 @@
 {
   "name": "creatly-video-director",
-  "version": "0.2.4-dev",
+  "version": "0.2.4-test",
   "description": "Create and revise short films on the Creatly canvas.",
   "author": {
     "name": "Creatly",
-    "url": "https://dev.yuanji.studio"
+    "url": "https://test.yuanji.studio"
   },
-  "homepage": "https://dev.yuanji.studio",
+  "homepage": "https://test.yuanji.studio",
   "keywords": [
     "film",
     "video",
@@ -22,7 +22,7 @@
   "mcpServers": {
     "yuanji": {
       "type": "http",
-      "url": "https://dev.yuanji.studio/api/agent/mcp/v2"
+      "url": "https://test.yuanji.studio/api/agent/mcp/v2"
     }
   },
   "defaultEnabled": false

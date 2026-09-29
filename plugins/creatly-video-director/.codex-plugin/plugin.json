@@ -1,12 +1,12 @@
 {
   "name": "creatly-video-director",
-  "version": "0.2.4-dev",
+  "version": "0.2.4-test",
   "description": "Create and revise short films on the Creatly canvas.",
   "author": {
     "name": "Creatly",
-    "url": "https://dev.yuanji.studio"
+    "url": "https://test.yuanji.studio"
   },
-  "homepage": "https://dev.yuanji.studio",
+  "homepage": "https://test.yuanji.studio",
   "keywords": [
     "film",
     "video",
@@ -25,7 +25,7 @@
       "Write",
       "Interactive"
     ],
-    "websiteURL": "https://dev.yuanji.studio",
+    "websiteURL": "https://test.yuanji.studio",
     "brandColor": "#E5484D",
     "defaultPrompt": [
       "使用 $film-narrative 把这个故事做成叙事短片。",
