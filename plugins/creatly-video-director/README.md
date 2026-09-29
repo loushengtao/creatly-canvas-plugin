@@ -1,6 +1,16 @@
-# Creatly Canvas Plugin · Dev
+# Creatly Canvas Plugin · 开发环境
 
-本分支通过远程 MCP 直接连接 [元极开发站点](https://dev.yuanji.studio/)，无需启动本地画布服务。
+本分支 `dev` 通过远程 MCP 连接 [dev.yuanji.studio](https://dev.yuanji.studio/)，无需启动本地画布服务。
+
+## 环境对应
+
+| 环境 | 网站 | GitHub 分支 |
+| --- | --- | --- |
+| 开发 | https://dev.yuanji.studio | dev |
+| 测试 | https://test.yuanji.studio | test |
+| 生产 | https://yuanji.studio | main |
+
+安装的分支决定连接的环境，打开另一个网站不会自动切换插件。切换环境前，在宿主中移除旧的 `creatly` marketplace 来源，再添加目标分支并重新加载插件；在目标环境完成授权，确认账号与空间。三个环境不共用授权和画布数据。
 
 ## Codex 安装
 
@@ -9,8 +19,6 @@ codex plugin marketplace add https://github.com/loushengtao/creatly-canvas-plugi
 codex plugin add creatly-video-director@creatly
 ```
 
-安装后开启新任务，在宿主提示的 dev 网站授权页面登录并确认账号与空间。单纯打开网站不等于完成插件授权。已安装其他分支时先在宿主中移除旧的 creatly marketplace 来源，再添加 dev，避免同名来源仍指向旧分支。
-
 ## Claude Code 安装
 
 ```text
@@ -18,34 +26,47 @@ codex plugin add creatly-video-director@creatly
 /plugin install creatly-video-director@creatly
 ```
 
-使用 `/mcp` 完成 yuanji 的 OAuth 授权。WorkBuddy 用户可下载本仓库 dev 分支源码 ZIP，按宿主的本地 marketplace 安装流程导入；宿主需支持 HTTP MCP 与 OAuth，未完成端到端兼容验证。
+安装后开启新任务，使用 `/mcp` 或宿主提示完成 yuanji 的 OAuth 授权，在 **dev.yuanji.studio** 登录。单纯打开网站不等于完成插件授权。
+
+## WorkBuddy
+
+下载 [dev 分支 ZIP](https://github.com/loushengtao/creatly-canvas-plugin/archive/refs/heads/dev.zip)，按宿主的本地 marketplace 安装流程导入。需要支持 HTTP MCP 与 OAuth；完整安装与授权流程尚未端到端验证。
 
 ## CLI / 手动 MCP 配置
+
+Codex：
 
 ```bash
 codex mcp add creatly-dev --url https://dev.yuanji.studio/api/agent/mcp/v2
 codex mcp login creatly-dev
 ```
 
-手动 MCP 配置可独立测试连接，不包含插件创作技能。已通过插件连接时无需重复添加。
+Claude Code：
 
-## 创作
+```text
+claude mcp add --transport http creatly-dev https://dev.yuanji.studio/api/agent/mcp/v2
+/mcp
+```
 
-三个技能共用远程连接：`film-narrative`（叙事短片）、`film-cinematic-realism`（写实电影）、`film-creation`（已有任务）。默认生图模型为 **Creatly Sigma 2.5 Sunburst、2K**，用户明确指定的参数优先。
+手动 HTTP MCP 配置：
 
-安装后可说：“使用 film-narrative，在 dev 站点创建一个短片项目，先完善剧本与人物设定；生成前告诉我预计费用。”
+```json
+{"mcpServers": {"creatly-dev": {"type": "http", "url": "https://dev.yuanji.studio/api/agent/mcp/v2"}}}
+```
 
-## 环境与协议
+手动 MCP 配置不包含插件创作技能；已通过插件连接时无需重复添加。
 
-- 本分支 `dev` 固定连接 `https://dev.yuanji.studio/api/agent/mcp/v2`。
-- Codex、Claude Code 和 WorkBuddy 配置统一使用 HTTP MCP；认证令牌由宿主管理，不打包凭据。
-- 通过 `tools/list` 获取当前工具和 Schema，参数平铺，不使用旧本地 clientId/payload 包装。具体见 [执行协议](skills/film-creation/references/mcp-execution.md)。
-- 仓库 `mcp/` 中原有本地 stdio 适配器作为旧开发工具保留，但本分支插件不加载它；它不能当作远程 CLI 使用。
-- main 仍保留此前发布的版本。未来生产发布必须显式配置并验证生产站点，不把 dev 地址当作生产地址。
+## 创作与协议
 
-## 验证
+三个技能共用远程连接：`film-narrative`（叙事短片）、`film-cinematic-realism`（写实电影）、`film-creation`（已有任务）。用户明确指定的模型与画质参数优先。
 
-开发站点的 OAuth 元数据返回 200，未授权 MCP 请求返回 401 并提供正确的授权发现地址。已通过 Codex 完成 OAuth 登录并发现 19 个远程工具，包括项目、画布、模型查询和生成工具。尚未执行付费生成，工具发现不等于生图验收。
+配置使用标准 HTTP MCP，由宿主管理 OAuth 授权与令牌刷新，不打包凭据。通过实时 `tools/list` 获取工具及 Schema，具体见 [执行协议](skills/film-creation/references/mcp-execution.md)。工具能力取决于对应环境的后端部署；插件升级不等于后端已发布，也不代表已完成付费生成验收。
+
+仓库中的旧 stdio 适配器仅为历史开发工具，本版本插件不加载它。
+
+## 维护环境版本
+
+在仓库根目录执行 `python3 scripts/configure-environment.py dev`，同步三个宿主的配置、版本、技能连接说明和安装文档；开发、测试、生产必须分别发布到 `dev`、`test`、`main`。
 
 ## 图片、视频、音频上传
 
