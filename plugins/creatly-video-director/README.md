@@ -1,6 +1,6 @@
-# Creatly Canvas Plugin · 开发环境
+# Creatly Canvas Plugin · 生产环境
 
-本分支 `dev` 通过远程 MCP 连接 [dev.yuanji.studio](https://dev.yuanji.studio/)，无需启动本地画布服务。
+本分支 `main` 通过远程 MCP 连接 [yuanji.studio](https://yuanji.studio/)，无需启动本地画布服务。
 
 ## 环境对应
 
@@ -15,43 +15,43 @@
 ## Codex 安装
 
 ```bash
-codex plugin marketplace add https://github.com/loushengtao/creatly-canvas-plugin.git --ref dev
+codex plugin marketplace add https://github.com/loushengtao/creatly-canvas-plugin.git --ref main
 codex plugin add creatly-video-director@creatly
 ```
 
 ## Claude Code 安装
 
 ```text
-/plugin marketplace add https://github.com/loushengtao/creatly-canvas-plugin.git#dev
+/plugin marketplace add https://github.com/loushengtao/creatly-canvas-plugin.git#main
 /plugin install creatly-video-director@creatly
 ```
 
-安装后开启新任务，使用 `/mcp` 或宿主提示完成 yuanji 的 OAuth 授权，在 **dev.yuanji.studio** 登录。单纯打开网站不等于完成插件授权。
+安装后开启新任务，使用 `/mcp` 或宿主提示完成 yuanji 的 OAuth 授权，在 **yuanji.studio** 登录。单纯打开网站不等于完成插件授权。
 
 ## WorkBuddy
 
-下载 [dev 分支 ZIP](https://github.com/loushengtao/creatly-canvas-plugin/archive/refs/heads/dev.zip)，按宿主的本地 marketplace 安装流程导入。需要支持 HTTP MCP 与 OAuth；完整安装与授权流程尚未端到端验证。
+下载 [main 分支 ZIP](https://github.com/loushengtao/creatly-canvas-plugin/archive/refs/heads/main.zip)，按宿主的本地 marketplace 安装流程导入。需要支持 HTTP MCP 与 OAuth；完整安装与授权流程尚未端到端验证。
 
 ## CLI / 手动 MCP 配置
 
 Codex：
 
 ```bash
-codex mcp add creatly-dev --url https://dev.yuanji.studio/api/agent/mcp/v2
-codex mcp login creatly-dev
+codex mcp add creatly --url https://yuanji.studio/api/agent/mcp/v2
+codex mcp login creatly
 ```
 
 Claude Code：
 
 ```text
-claude mcp add --transport http creatly-dev https://dev.yuanji.studio/api/agent/mcp/v2
+claude mcp add --transport http creatly https://yuanji.studio/api/agent/mcp/v2
 /mcp
 ```
 
 手动 HTTP MCP 配置：
 
 ```json
-{"mcpServers": {"creatly-dev": {"type": "http", "url": "https://dev.yuanji.studio/api/agent/mcp/v2"}}}
+{"mcpServers": {"creatly": {"type": "http", "url": "https://yuanji.studio/api/agent/mcp/v2"}}}
 ```
 
 手动 MCP 配置不包含插件创作技能；已通过插件连接时无需重复添加。
@@ -66,7 +66,7 @@ claude mcp add --transport http creatly-dev https://dev.yuanji.studio/api/agent/
 
 ## 维护环境版本
 
-在仓库根目录执行 `python3 scripts/configure-environment.py dev`，同步三个宿主的配置、版本、技能连接说明和安装文档；开发、测试、生产必须分别发布到 `dev`、`test`、`main`。
+在仓库根目录执行 `python3 scripts/configure-environment.py production`，同步三个宿主的配置、版本、技能连接说明和安装文档；开发、测试、生产必须分别发布到 `dev`、`test`、`main`。
 
 ## 图片、视频、音频上传
 
