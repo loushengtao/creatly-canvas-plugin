@@ -6,7 +6,7 @@ from pathlib import Path
 
 ENVIRONMENTS = {
     'dev': ('dev', 'dev.yuanji.studio', '开发', '0.2.4-dev'),
-    'test': ('test', 'test.yuanji.studio', '测试', '0.2.5-test'),
+    'test': ('test', 'test.yuanji.studio', '测试', '0.2.6-test'),
     'production': ('main', 'yuanji.studio', '生产', '0.2.4'),
 }
 
@@ -47,7 +47,6 @@ def configure(root, environment):
         old = path.read_text()
         # Keep workflow documentation separate from generated installation instructions.
         tail = old[old.index('## 图片、视频、音频上传'):] if '## 图片、视频、音频上传' in old else old[old.index('## 生成确认'):]
-        tail = tail.replace('kind="character"|"scene"`', 'kind="character"|"scene"|"prop"|"custom"`')
         protocol = 'skills/film-skill/references/mcp-execution.md'
         if path == root / 'README.md': protocol = 'plugins/creatly-video-director/' + protocol
         header = f'''# Creatly Canvas Plugin · {label}环境

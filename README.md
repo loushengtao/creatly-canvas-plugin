@@ -74,9 +74,9 @@ claude mcp add --transport http creatly-test https://test.yuanji.studio/api/agen
 
 ## 0.2.0 精简工具目录
 
-新版后端默认提供 13 个工具（生成关闭时 12 个）：`listProjects`、`projectCreate`、`getCanvasContext`、`createNode`、`updateNode`、`deleteNodes`、`createSubject`、`upload`、`listGenerationModels`、`listSystemVoices`、`calculateCredits`、`generateNodes`、`getGenerationStatus`。
+当前工具包括 `listProjects`、`projectCreate`、`getCanvasContext`、`getCanvasOutline`、`getNodes`、`createNode`、`updateNode`、`deleteNodes`、`createSubject`、`upload`、`listGenerationModels`、`listSystemVoices`、`calculateCredits`、`generateNodes`、`getGenerationStatus`；能力以实时 `tools/list` 为准。
 
-`getCanvasContext` 默认 compact，需要生成配置等详细信息时传 `detail="full"`；主体列表合入 `subjects`。`createSubject` 用 `kind="character"|"scene"|"prop"|"custom"` 选择主体类型。
+`getCanvasContext` 默认 compact，需要生成配置等详细信息时传 `detail="full"`；主体列表合入 `subjects`。`createSubject` 的 kind 为 character/scene；道具和自定义主体使用 scene 分支的 subjectType=prop/custom，自定义分类传真实 subjectTypeId。
 
 上传统一走 `upload`：`action="prepare"` 申请直传 → 本机上传原始字节 → `action="complete"` 登记。支持图片、视频、音频、文本（txt/md）；文本返回文件引用，需要在画布展示时再创建直接输入的文本节点。上传不自动发起生成。
 

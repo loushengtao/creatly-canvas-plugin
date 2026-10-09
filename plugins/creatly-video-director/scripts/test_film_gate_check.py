@@ -57,6 +57,28 @@ class GateTests(unittest.TestCase):
         result = {(l, g) for l, g, _, _ in Checker(nodes, 30, 10, 30, set(), subjects).run()}
         self.assertNotIn(('FAIL', 'unknown-subject'), result)
 
+    def test_formal_subject_id_resolves_from_node_detail(self):
+        nodes = canvas(GOOD.replace('[@汤米]', '[@501]'))
+        next(n for n in nodes if n['id'] == 'tom')['subjects'] = {'subject': {'elementId': '501'}}
+        self.assertNotIn(('FAIL', 'unknown-subject'), gates(nodes))
+        self.assertNotIn(('FAIL', 'subject-link'), gates(nodes))
+
+    def test_explicit_unlinked_subject_is_rejected_even_with_picture(self):
+        for detail in ({'subjects': {'subject': None}}, {'elementId': '0'}, {'elementId': None}):
+            with self.subTest(detail=detail):
+                nodes = canvas(GOOD)
+                next(n for n in nodes if n['id'] == 'tom').update(detail)
+                self.assertIn(('FAIL', 'subject-link'), gates(nodes))
+
+    def test_unlinked_color_card_cannot_pass_with_child_picture(self):
+        nodes = canvas(GOOD)
+        next(n for n in nodes if n['id'] == 'card')['elementId'] = 0
+        self.assertIn(('FAIL', 'subject-link'), gates(nodes))
+
+    def test_empty_color_card_container_is_rejected(self):
+        nodes = [n for n in canvas(GOOD) if n['id'] != 'card-img']
+        self.assertIn(('FAIL', 'color-card'), gates(nodes))
+
     def test_encoded_mention_warns_and_card_line_counts(self):
         token = 'dXmax4a7kW1Q1JdaDxIoE56ln0id1gAJ3NCrJsJE1z9FOdq6wokweKg'
         result = gates(canvas(GOOD.replace('[@色卡]', f'[@{token}]')))

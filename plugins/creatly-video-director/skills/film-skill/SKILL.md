@@ -61,7 +61,7 @@ description: 电影、AI 短片和漫剧的一体化创作技能：从故事、�
 
 ## 画布规则（默认强制，用户可逐项豁免）
 
-细节与参数见 [MCP 执行协议](references/mcp-execution.md)。
+细节与参数见 [MCP 执行协议](references/mcp-execution.md)。正式主体用 createSubject 建档，画布 element 容器不等于主体库记录；写入仅使用实时 Schema 开放的字段，不把读取结果的 elementBindings 直接传回。参数定义不可见、主体引用失败时，先按协议诊断，不靠试写或重新生成排错。
 
 - **主体只 @，不连线。** 角色、场景、道具、色卡都做成主体，在 Frame 和 Video 提示词里 `[@主体名]` 提及（画布保存后可能显示为 `[@主体ID]`）；主体不写进 `parentIds`，也不重复写进 referenceResources。
 - **色卡在分镜之前。** 每幕（色调不同的场景各一张）先出色卡主体：暗部、中间调、高光三档色块加 HEX，来自已认可画面的真实取色。每个分镜和视频提示词加「【色卡】[@色卡] …」。

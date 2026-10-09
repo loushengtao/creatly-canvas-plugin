@@ -59,7 +59,7 @@ def subject_aliases(subjects):
             groups.extend(value)
     aliases = {}
     for item in groups:
-        for ref in (item.get('id'), item.get('elementId')):
+        for ref in (item.get('id'), item.get('elementId'), item.get('subjectNodeId'), item.get('mentionId')):
             if ref and item.get('label'):
                 aliases[str(ref)] = item['label']
     return aliases
@@ -84,6 +84,11 @@ class Checker:
         self.elements = {n['label']: n for n in nodes if n['type'] == 'element'}
         self.element_by_ref = dict(self.elements)
         self.element_by_ref.update({e['id']: e for e in self.elements.values()})
+        for element in self.elements.values():
+            subject = (element.get('subjects') or {}).get('subject') or {}
+            ref = subject.get('elementId') or element.get('elementId')
+            if ref and str(ref) != '0':
+                self.element_by_ref[str(ref)] = element
         for ref, label in subject_aliases(subjects or {}).items():
             if label in self.elements:
                 self.element_by_ref[ref] = self.elements[label]
@@ -102,11 +107,23 @@ class Checker:
     def mentions(self, text):
         return [self.element_by_ref.get(m) for m in MENTION.findall(text)], MENTION.findall(text)
 
+    @staticmethod
+    def unlinked(element):
+        """Only reject explicit missing links; absent fields need a fresh subject read."""
+        detail = element.get('subjects')
+        if isinstance(detail, dict) and 'subject' in detail:
+            return not detail['subject'] or str(detail['subject'].get('elementId')) == '0'
+        if 'elementId' in element:
+            return element['elementId'] is None or str(element['elementId']) == '0'
+        return False
+
     def check_project(self):
         for e in self.elements.values():
             if not self.children(e) and not e.get('frameFiles'):
                 self.add(WARN, 'subject-images', e, '快照里看不到这个主体的图片（主体库图片不随快照返回），生成前请在画布上确认已上传')
-        if self.card is not None and self.children(self.card) \
+        if self.card is not None and self.unlinked(self.card):
+            self.add(FAIL, 'subject-link', self.card, '色卡容器未关联有效正式主体，请先核对主体库登记')
+        if self.card is not None and not self.card.get('frameFiles') \
                 and not any(n.get('frameFiles') for n in self.children(self.card)):
             self.add(FAIL, 'color-card', self.card, '色卡主体里没有已生成的图片，分镜前必须先有色卡')
         for e in self.elements.values():
@@ -128,6 +145,8 @@ class Checker:
                 opaque += 1
             elif element is None:
                 self.add(FAIL, 'unknown-subject', node, f'提及的主体 [@{name}] 不存在')
+            elif self.unlinked(element):
+                self.add(FAIL, 'subject-link', node, f'提及的主体「{element["label"]}」未关联有效主体库记录')
         if opaque:
             self.add(WARN, 'unverified-mention', node, f'{opaque} 处 @ 是站点保存后的编码 ID，脚本无法核对对应哪个主体，请在画布上确认')
         if self.card is not None and self.card not in found and not CARD_LINE.search(text):

@@ -1,4 +1,4 @@
-# 远程 MCP 执行协议（dev）
+# 远程 MCP 执行协议
 
 ## 连接与授权
 
@@ -10,17 +10,25 @@
 
 ## 参数与画布状态
 
-标准 v2 工具参数按实时 inputSchema **平铺**传递，不包裹旧版 `payload`，不传本地 `clientId`。projectId/nodeId 等使用服务端返回的原始不透明字符串，不解密、不转换成数据库数字，也不直接传整个 workbench URL。版本号和其他字段遵循实际 Schema 的类型。
+标准 v2 工具参数按实时 inputSchema **平铺**传递，不包裹旧版 `payload`，不传本地 `clientId`。projectId/nodeId/elementId/assetId/fileId 原样使用各自读取接口返回的字符串；当前 v2 资源 ID 是十进制字符串，不转成 JavaScript Number，也不自行加密或解密。mentionToken、uploadId、generationRef 等标识原样保留，不从 workbench URL 推算 ID。版本号和其他字段遵循实际 Schema 的类型。
 
 先读取 `getCanvasContext(detail="compact")`，需要模型配置和资源详情时使用 `detail="full"`。主体分组在 `subjects` 中，保留节点、关系、位置、媒体、版本及状态摘要。读取返回的 scope 必须覆盖修改范围；过滤快照不能当作完整画布。缺少字段不等于空值，不建立另一个可写 Film DSL 副本。
 
 主体读取仍使用 `getCanvasContext`：`subjects.subjectTypes` 是当前可用分类（含已有“其他”分类），`subjects.elements` 是正式主体资产；`detail="full"` 返回 assets、fileRefList、referenceLayout，可传 subjectId 精读或 subjectQuery 搜索。结果最多 100 个主体，缺少目标时精读或搜索，不推断主体不存在。character/environment/product/custom 分组中的 id/subjectNodeId 是画布节点，elementId 才是主体资产 ID；不要互换。
 
-引用优先用读取结果的 mentionToken（例如 `[@主体资产ID]` 或 `[@主体节点ID]`），重名时不用裸名称。需要选定参考图时，在 createNode/updateNode 的 generationParams.elementBindings 中传 elementId、与提示词 token 一致的 mentionId、referenceMode="ASSET_SUBSET"、selectedAssetIds；附件 ID 来自 assets，不能用文件 ID 代替。引用整个主体使用 WHOLE_ELEMENT。不需要连线；更新后用 full 回读 elementBindings 核验。资产已存在但尚未应用到画布，也可按 elementId 引用。
+引用优先用读取结果的 mentionToken；返回 mentionId 时按工具说明组成 `[@mentionId]`，重名时不用裸名称。先确认目标已应用到当前画布且关联正式主体。当前已核验的 v2 createNode/updateNode 不接收 `generationParams.elementBindings`：在 content 中写入真实 token，由服务端解析绑定，再回读核验。读取结果里的 elementBindings、referenceMode、selectedAssetIds 不自动等于可写参数；只有实时写入 Schema 明确开放时才能传。需要选素材子集时先查实际能力，不能假称已经选定；不要自行拼接、转换主体 ID 或把 fileId 当成 assetId。
 
-createSubject 返回 elementId、subjectNodeId、generationNodeIds 和 assetTaskPlans；建档不扣费，生成仍走 calculateCredits → 用户确认费用 → generateNodes。成功图片由服务端归档到主体素材，随后精读主体核验；不要手工回写结果或因待生成而重建主体。角色的基础三视图用 threeView，旧 triView 仍是三视图别名，新造型用 look。
+正式主体使用 createSubject 创建；普通 `createNode(type="element")` 只建容器，不据此认定已登记主体库。createSubject 返回 elementId、subjectNodeId、generationNodeIds 和 assetTaskPlans；保存各 ID 的职责，按 [主体创建](subjects.md) 核验关联。建档不扣费，生成仍走 calculateCredits → 已有费用授权核验 → generateNodes。成功图片由服务端归档到主体素材，随后精读主体核验；不要因待生成而重建主体。基础三视图字段为 threeView（triView 是旧别名），不传当前 Schema 未开放的 look 等字段。
 
 写入按实时定义提供 `idempotencyKey`、`expectedNodeStates`、`expectedDeletion`、`expectedSourceFiles` 等所需字段。摘要来自当前快照，不能凭空补造；冲突后先重新读取并检查用户改动。相同操作使用稳定幂等键，参数改变视为新操作。工具失败或超时先查原状态，不自动重复写入或付费生成。
+
+### 参数不可见与失败恢复
+
+- 宿主只展示 `unknown & unknown` 或无字段对象时，不能据此判定远端没有该能力。优先通过宿主提供的工具发现功能读取同一连接的完整 inputSchema；不要假造工具名，也不要用画布写入来试探字段。仍无法取得定义时，保留待执行内容并说明缺少哪个工具的参数定义，本地示例仅作核对线索，不代替实时契约；不为查 Schema 索取令牌或绕到旧接口。
+- 调用前检查顶层必填项、枚举与额外字段限制。createSubject 当前必填 projectId、idempotencyKey、kind、label；scene 还必填 sceneDescription。`kind` 当前只接受 character/scene，道具与自定义分类通过 scene 分支的 subjectType/subjectTypeId 选择，不传 kind=prop/custom。
+- `invalid_arguments`：记录工具名、请求字段、code、message、traceId（如有），对照实际 Schema 定位缺失或多传字段，再修正；不要随机删模型、参考文件或依次猜 subType。请求明确被拒绝且原因已定位后可修正重试；同类错误修正后仍出现，停止该写入并报告证据，继续无依赖工作。
+- “三视图生成需要基础形象”：检查 frontView 计划或真实可复用的演员素材。只有 threeView.content，或在文字里写“沿用已有图”，都不构成图像绑定；具体复用与上传路径见 [主体创建](subjects.md#创建角色结构)。
+- “正式主体不存在或已删除”：逐个回读当前提示词引用的节点及主体，核对项目、elementId、主体记录和媒体。关联为空或 0 的 element 容器不是正式主体；不把节点 ID 换名当作主体 ID，也不修改数据库补关联。确需建档时先排除重复，再在授权范围内 createSubject，验证成功后更新受影响引用，保留旧素材。记录完整 traceId，不能把这种错误当作图片生成失败而重新扣费。
 
 ## 生成与交付
 
@@ -75,9 +83,9 @@ createSubject 返回 elementId、subjectNodeId、generationNodeIds 和 assetTask
 
 1. 顺序：风格参考 / 剧照复刻 → 角色与场景主体 → **色卡** → 分镜 Frame → Video。没有色卡时不提交分镜 Frame 的 generateNodes。
 2. 色卡内容：一张 16:9 图片，按暗部、中间调、高光三档排列 8–10 个色块，每块标注 HEX；来源是已认可的参考剧照或已定稿画面的真实取色（按亮度分档取色），不要凭空编色。可以本地取色后拼图上传，也可以在画布上用图片模型生成色卡 Frame。
-3. 做成色卡主体：新建一个 `type=element` 的色卡主体（如「色卡」），把色卡图片放进该主体，排在分镜组之前（画布上方或左侧，与角色主体同一排）。
+3. 做成正式色卡主体：先查已有主体与 subjects.subjectTypes；用 `createSubject(kind="scene", subjectType="custom", subjectTypeId=真实分类ID)` 在适合的“色卡”或“其他”分类建档，提供 projectId、idempotencyKey、label、sceneDescription。需要生成计划时按 Schema 加 imagePrompt；已有色卡图片则走真实文件挂载能力，不付费重生。排在分镜组之前，与角色主体同一排。不能用无关联的 `type=element` 空框代替；分类或文件归档能力不足时记录待绑定，继续不依赖它的工作。
 4. 引用方式：每个分镜 Frame 和 Video 的提示词都用 `[@色卡]` 提及色卡主体，不连线，也不再把色卡图写进 referenceResources。
-5. 生成前用 `getCanvasContext(detail="full")` 回读，确认每个待生成节点的提示词都含 `[@色卡]` 和全部出场角色的 `[@角色名]`，且色卡主体里有图片。
+5. 生成前用 getNodes/完整主体读取核对：色卡应用节点关联有效 elementId，正式主体 assets 中有可用图片，每个待生成节点的提及都解析到预期主体。子 Frame 有图片不等于图片已归档到主体；正式主体素材为空时不得宣称色卡锁定成功。
 6. 提示词：加一行「【色卡】[@色卡] …」，写明它只锁定色调、明暗比例和饱和度，不决定构图、人物和道具，并抄录关键 HEX（如「暗部 #0F0D0A–#282017，中间调 #312C25–#6A523A，高光只在光源附近 #937151–#E4C59F」）。
 7. 换色调（如日景转夜景、换场景）时新建对应色卡，不沿用旧色卡。
 
@@ -109,7 +117,7 @@ createSubject 返回 elementId、subjectNodeId、generationNodeIds 和 assetTask
 
 ## 精简工具目录
 
-默认最多 13 个工具：listProjects、projectCreate、getCanvasContext、createNode、updateNode、deleteNodes、createSubject、upload、listGenerationModels、listSystemVoices、calculateCredits、generateNodes、getGenerationStatus。以实时 tools/list 为准，生成能力可能关闭。createSubject(kind="character"|"scene"|"prop"|"custom") 将正式主体写入用户可见的主体库并应用到画布，不自动生成；custom 必须使用当前 subjectTypes 中真实存在的 subjectTypeId。删除一个或多个节点都使用 deleteNodes，在用户指定的删除范围内直接执行，无需网页确认或 confirmOperation。先读取目标 deletion 观察并传入 expectedDeletions，重试沿用原参数及幂等键。
+当前工具包括 listProjects、projectCreate、getCanvasContext、getCanvasOutline、getNodes、createNode、updateNode、deleteNodes、createSubject、upload、listGenerationModels、listSystemVoices、calculateCredits、generateNodes、getGenerationStatus；数量与能力以实时 tools/list 为准，不把这份清单当作连接成功证据。createSubject 的角色、道具、自定义分类用法见 [主体创建](subjects.md)。删除一个或多个节点都使用 deleteNodes，在用户指定的删除范围内直接执行，无需网页确认或 confirmOperation。先读取目标 deletion 观察并传入 expectedDeletions，重试沿用原参数及幂等键。
 
 节点连线使用 createNode/updateNode 的 parentIds：给 B 设置 parentIds=[A的ID] 建立 A → B。该字段替换完整输入列表，追加时保留已有 ID，[] 清空；parentNode 仅表示嵌套归属。需要指定参考图、首尾帧或音视频用途时同步设置 generationParams.referenceResources。
 

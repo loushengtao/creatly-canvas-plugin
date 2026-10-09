@@ -10,7 +10,7 @@
     {
       "name": "creatly-video-director",
       "description": "Create and revise short films on the Creatly canvas.",
-      "version": "0.2.5-test",
+      "version": "0.2.6-test",
       "author": {
         "name": "Creatly"
       },

@@ -38,7 +38,7 @@
 
 每张参考图必须说明解决什么连续性问题。两个视图不能在门窗、家具、道具、光源和左右关系上互相冲突。
 
-`createSubject(kind="scene")` 只负责初始化场景 `element`、描述 Text 和基准 Frame，不代表场景主体只能包含一个 Frame。场景 `element` 可以内嵌多张参考 Frame：主体已经存在时，用 `createNode.parentNode` 指向真实场景主体 ID；同批创建容器和子 Frame 时，用 `parentNodeRef` 指向该 `element` 的 `clientRef`。多个 Frame 可以指向同一个 `parentNode` 或 `parentNodeRef`。
+`createSubject(kind="scene")` 创建正式场景主体、画布应用节点及可选参考图计划，不限制只能有一张参考图。额外 Frame 的 createNode.parentNode 指向返回的 subjectNodeId（不是 elementId）；多个 Frame 可以共用该容器。排版内嵌不等于素材已归档：作为主体提及参考前，按 [主体创建](subjects.md) 回读正式主体 assets 核对。
 
 嵌套归属与生成依赖必须分开表达：`parentNode` 和 `parentNodeRef` 表示节点位于哪个 `element` 内；`parentIds` 和 `parentRefs` 只表示 Edge 关系。不要用 Edge 代替主体内嵌关系。额外 Frame 创建后必须回读 FULL 快照，确认其归属，再按生产顺序生成和验收；不伪造节点或用聊天图片代替。
 
