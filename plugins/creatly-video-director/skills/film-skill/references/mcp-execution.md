@@ -12,7 +12,24 @@
 
 标准 v2 工具参数按实时 inputSchema **平铺**传递，不包裹旧版 `payload`，不传本地 `clientId`。projectId/nodeId/elementId/assetId/fileId 原样使用各自读取接口返回的字符串；当前 v2 资源 ID 是十进制字符串，不转成 JavaScript Number，也不自行加密或解密。mentionToken、uploadId、generationRef 等标识原样保留，不从 workbench URL 推算 ID。版本号和其他字段遵循实际 Schema 的类型。
 
-先读取 `getCanvasContext(detail="compact")`，需要模型配置和资源详情时使用 `detail="full"`。主体分组在 `subjects` 中，保留节点、关系、位置、媒体、版本及状态摘要。读取返回的 scope 必须覆盖修改范围；过滤快照不能当作完整画布。缺少字段不等于空值，不建立另一个可写 Film DSL 副本。
+找节点先读 `getCanvasOutline`，按游标逐页定位目标；已知 nodeId/externalKey 时直接读对应节点。`getCanvasContext(detail="compact")` 仍含节点正文，不把它当作轻量目录反复全量读取。只有需要完整画布快照或主体资产详情时才读取对应 context；保存回执用于同一版本的后续检查，不把大份 JSON 重复回显到对话。读取返回的 scope 必须覆盖修改范围；过滤快照不能当作完整画布。缺少字段不等于空值，不建立另一个可写 Film DSL 副本。
+
+### 按需读取节点
+
+先检查实时 inputSchema 是否已开放下列参数，插件升级不等于后端已发布：
+
+| 本轮要做什么 | getNodes 读取方式 |
+| --- | --- |
+| 看标题、状态、内容概况、是否已有媒体 | `detail="brief"`，默认 `fields=["summary"]`；最多 20 个节点，正文只预览 60 字 |
+| 修改正文或提示词 | `detail="full", fields=["content","writeState"]`，只读目标节点；预览不能覆盖全文 |
+| 核对模型、分辨率、音频开关 | `detail="full", fields=["generationSettings"]`，没有提示词和参考列表 |
+| 检查或替换垫图 | `detail="full", fields=["generationParams","writeState"]`；需要主体展开素材时再加 subjects，不为查参考图顺带取正文、时间轴 |
+| 看真实挂载的文件 | `detail="full", fields=["media"]` |
+| 删除节点 | `fields=["deletion"]`，取得目标的删除摘要和影响范围 |
+
+full 每批最多 5 个节点，长提示词通常一次只读 1 个。full 的 generationParams 不重复带 prompt；正文从 content 读。summary 的 directReferenceCount 是直接资源条目数，subjectReferenceCount 是主体绑定数量，都不能当作展开后的全部参考图片数。需要核对实际参考图上限时读取对应 generationParams/subjects。
+
+旧后端没有 detail/summary/generationSettings 时，不发送未开放字段；用旧 fields 精读目标：查状态用 details，改正文用 content/writeState，查参考用 generationParams，需要什么才追加什么。仅在未开放轻量配置字段时使用 generationParams 核对模型。旧显式 fields 且省略 detail 的调用保持原有语义。不要把所有 fields 作为通用读法，也不在每个检查步骤反复取同一份长提示词。
 
 主体读取仍使用 `getCanvasContext`：`subjects.subjectTypes` 是当前可用分类（含已有“其他”分类），`subjects.elements` 是正式主体资产；`detail="full"` 返回 assets、fileRefList、referenceLayout，可传 subjectId 精读或 subjectQuery 搜索。结果最多 100 个主体，缺少目标时精读或搜索，不推断主体不存在。character/environment/product/custom 分组中的 id/subjectNodeId 是画布节点，elementId 才是主体资产 ID；不要互换。
 
@@ -48,12 +65,12 @@
 2. 用主体提及锁定，不连线：凡是涉及主体（角色、场景、色卡等）的 Frame 和 Video，都在提示词里用 `[@主体名]` 提及（画布保存后可能显示为 `[@主体ID]`，两种写法等价），系统据此建立正式 elementBindings 并带入主体素材；只有历史画布主体使用 mentionElementIds。主体不写进 `parentIds`，也不把主体图重复写进 referenceResources。Video 的 referenceResources 只放本镜分镜、补拍图和音频，提示词里原来的【图N】角色行改写成「[@角色名]：锁定的特征」，其余【图N】按新顺序重新编号。
 3. 每个出场角色各垫一张：双人或多人镜头要把每个出场角色的正视图都垫上；只露背影、肩膀或手的角色同样要垫，以锁定服装与发型。
 4. 提示词写明引用职责：说明每张参考图锁定什么（脸、发型、帽子、服装），并写明参考图不决定构图。
-5. 生成前回读核对：用 `getCanvasContext(detail="full")` 检查每个待生成节点的提示词都用 `[@角色名]` 提及了全部出场角色；缺任何一个就先补齐，不提交 generateNodes。
+5. 生成前回读核对：对本批目标用 `getNodes(detail="full", fields=["content","subjects"])`（旧部署用已开放的相同 fields）检查提示词都用 `[@角色名]` 提及了全部出场角色；缺任何一个就先补齐，不提交 generateNodes。
 6. 改角色图后传播：角色正视图重新生成后，列出所有引用它的分镜和视频，按用户确认的范围重生。
 
 ## 视频参考素材（全能参考，强制）
 
-视频默认 **Seedance 2.5、480p、开启音频**。先用实时 `listGenerationModels(scene="video", detail="full")` 确认模型标识及 480p/音频能力；新建视频显式写入 `generationParams.resolution="480p"`、`generationParams.bgm=true`。用户明确选择优先，不覆盖既有已确认配置；不支持默认组合时说明缺口，不擅自换模型或提高分辨率。估价前、生成前用 `getNodes` 回读核对模型、分辨率和音频开关，确保节点、估价和生成参数一致。
+视频默认 **Seedance 2.5、480p、开启音频**。先用实时 `listGenerationModels(scene="video", detail="compact")` 定位模型，再带目标 `modelIds` 精读 full 确认 480p/音频能力；新建视频显式写入 `generationParams.resolution="480p"`、`generationParams.bgm=true`。用户明确选择优先，不覆盖既有已确认配置；不支持默认组合时说明缺口，不擅自换模型或提高分辨率。估价前、生成前只对本批目标用 `getNodes(detail="full", fields=["generationSettings"])` 回读核对模型、分辨率和音频开关（旧部署按上面的兼容方式读取），确保节点、估价和生成参数一致。
 
 视频默认走全能参考（`videoType="referenceImg"`）：只垫资产，镜头关系写进提示词。
 
@@ -73,7 +90,7 @@
 
 - 分镜前：色卡主体已有图片。
 - 视频前：本镜出场角色各有至少 3 个视角；有场景图和对应状态的站位图；提示词 `[@]` 了全部出场主体，并写清轴线和正反打；每个镜头的物料已放进本镜组。
-- 生成前：回读画布，把 `getCanvasContext(detail="full")` 存成 JSON，运行插件的 `scripts/film_gate_check.py`（用法见 [脚本说明](../../../scripts/README.md)「生成前门禁」）；有未豁免的 FAIL 不提交 generateNodes。本批范围与费用已在对话中确认。
+- 准备提交生成时：读取一次必要的 full 画布快照并保存 JSON，同一画布版本复用已保存快照，不反复把全量正文放入对话；局部修改或移除垫图不触发这次全量门禁读取。运行插件的 `scripts/film_gate_check.py`（用法见 [脚本说明](../../../scripts/README.md)「生成前门禁」）；有未豁免的 FAIL 不提交 generateNodes。本批范围与费用已在对话中确认。
 
 用户可以对任一关卡明确说「跳过」或「这次不用」，照做即可（运行门禁时用 `--skip <关卡名>`）：在回复里点明跳过了哪一项、可能的影响，不反复劝阻。风格、景别、镜头数量、时长、垫图多少、是否先出分镜图等创作选择由用户决定，skill 只给默认值和建议，不替用户做硬性决定。
 
@@ -104,7 +121,7 @@
 
 用户偏好：整个工作区尽量接近正方形，既不要过宽，也不要过高；以素材可读、分区清楚和空间利用率为前提，不为凑方形留下大块空白。
 
-- 先读全量节点、现有分组和真实引用，记录整理前状态。区分剧本与主体资料、按剧情排序的制作段落、分镜、参考开发、配音及剪辑素材；同一段的材料集中，当前制作区易于找到。
+- 先分页读完整大纲，按需精读现有分组、布局和真实引用，记录整理前状态；不为整理布局顺带读取全部提示词和时间轴。区分剧本与主体资料、按剧情排序的制作段落、分镜、参考开发、配音及剪辑素材；同一段的材料集中，当前制作区易于找到。
 - 根据实际节点宽高和数量选择行列；整体包围框的宽高尽量接近，段落按左到右、上到下的阅读顺序换行。组内沿用分镜、音频、视频、补拍的语义顺序，材料较多时分行；不强行排成一条横线或竖线。
 - 先计算组内节点的相对坐标，再根据子节点边界确定组尺寸，最后排组。为标题、媒体卡片和音频控件留出空间，统一同类卡片尺寸、行距与组间距；不裁切或改变媒体本身的比例。
 - 优先利用相邻空位；新增内容放在相关段落附近，并在必要时重排相邻行列，避免每次向最右或最下追加。整体方形只是偏好，不以大量留白或缩小到无法辨认为代价。
@@ -123,6 +140,6 @@
 
 视频 generationParams.bgm 是网页上的「音频」开关，决定是否生成声音（环境声、音效、对白），不是背景音乐开关；需要台词或音效的视频必须为 true，不要为了「不要配乐」传 false——不要配乐写进提示词（如「无背景音乐」）。新后端在设置 model 而不传 bgm 时按模型配置默认值（Seedance 2.5 为开）；提交前用 getNodes 读回 bgm 核对。
 
-已上传的图片、视频、音频需要作为画布上的节点自身素材时（效果同在画布拖入上传），用 createNode(nodes=[{clientRef,type,label,fileRef:{id:上传回执.fileRef.id}}]) 新建，content 可省略：图片用 type="frame"、视频用 type="video"、音频用 type="audio"，文件类型须与节点类型一致；已有节点用 updateNode(nodes=[{nodeId, fileRef:{id}}]) 替换当前文件，多个节点可一次批量挂载，按最新画布提供 expectedNodeStates 和幂等键。fileRef 仅传 id；不重传已有文件，不调用 generateNodes 或 TTS，不扣费；挂载后用 getCanvasContext 检查 frameFiles/videoFiles/audioFiles。只放进 referenceResources 或连线不会把文件挂成节点自身素材，画布上也看不到。以实时 Schema 中 fileRef 的节点类型为准：旧后端只允许 audio，需要先部署更新。
+已上传的图片、视频、音频需要作为画布上的节点自身素材时（效果同在画布拖入上传），用 createNode(nodes=[{clientRef,type,label,fileRef:{id:上传回执.fileRef.id}}]) 新建，content 可省略：图片用 type="frame"、视频用 type="video"、音频用 type="audio"，文件类型须与节点类型一致；已有节点用 updateNode(nodes=[{nodeId, fileRef:{id}}]) 替换当前文件，多个节点可一次批量挂载，按最新画布提供 expectedNodeStates 和幂等键。fileRef 仅传 id；不重传已有文件，不调用 generateNodes 或 TTS，不扣费；挂载后按读取策略用 getNodes 的 media 字段核对目标文件；只有旧部署缺少此字段时，才在相关 context 中检查 frameFiles/videoFiles/audioFiles。只放进 referenceResources 或连线不会把文件挂成节点自身素材，画布上也看不到。以实时 Schema 中 fileRef 的节点类型为准：旧后端只允许 audio，需要先部署更新。
 
 视频的输入按「视频参考素材（全能参考，强制）」准备：主体 `[@主体名]`，站位图和补充视角写 referenceResources，音频按顺序连线；正反打、补拍画面不作为视频参考。跨镜头参考时显式加入本镜 Shot 并传 nodeIndex，人物图本身无需 Shot。多图模式使用 generationParams.videoType="referenceImg"；需要精确编号时按提示词顺序写 referenceResources，图片用 IMAGE/REFERENCE，配音用 AUDIO/SOURCE_AUDIO，分别对应图1…和音频1…。不要再将“一张图/一条音频”或“人物/补拍图不能连视频”当成通用限制。生成仍需核对具体模型的素材数量、格式与时长要求。首尾帧 keyframe 模式与多图 referenceImg 模式区分使用。

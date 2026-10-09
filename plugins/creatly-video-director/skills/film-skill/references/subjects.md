@@ -6,7 +6,7 @@
 
 ## 先读取已有主体
 
-按实时 Schema 读取 `getCanvasContext(detail="full")` 的 subjects，必要时按 subjectId/subjectQuery 精读或搜索；用 getNodes 精读已有应用节点。只以当前接口暴露的参数为准。
+按实时 Schema 用 subjectId/subjectQuery 定位后读取 `getCanvasContext(detail="full")` 的 subjects；首次建档需扫描现有主体时才取目录范围，复用同一版本的回执。用 getNodes 精读已有应用节点，具体字段见 [读取策略](mcp-execution.md#按需读取节点)。只以当前接口暴露的参数为准。
 
 区分主体库 elementId、画布 subjectNodeId、主体素材 assetId 与媒体 fileRef.id；用名称、分类、素材内容和关联 ID 一起判断复用。普通 element 容器、同名节点或空的 subjects.subject 都不能证明正式主体已存在。名称大小写、空格和标点按服务端返回处理。
 
