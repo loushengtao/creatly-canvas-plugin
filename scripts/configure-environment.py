@@ -6,7 +6,7 @@ from pathlib import Path
 
 ENVIRONMENTS = {
     'dev': ('dev', 'dev.yuanji.studio', '开发', '0.2.4-dev'),
-    'test': ('test', 'test.yuanji.studio', '测试', '0.2.7-test'),
+    'test': ('test', 'test.yuanji.studio', '测试', '0.2.8-test'),
     'production': ('main', 'yuanji.studio', '生产', '0.2.4'),
 }
 

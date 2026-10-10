@@ -144,6 +144,26 @@ class GateTests(unittest.TestCase):
             self.assertEqual(main([str(path), '--skip', 'character-views']), 0)
             self.assertEqual(main([str(path)]), 1)
 
+    def test_context_pagination_requires_full_same_version_and_all_nodes(self):
+        page1 = {'project': {'id': '101', 'currentVersion': 9}, 'scope': {'kind': 'FULL'},
+                 'detail': 'full', 'complete': False, 'nextCursor': 'cursor', 'totalNodes': 2,
+                 'nodes': [{'id': '1', 'type': 'video', 'label': 'A'}]}
+        page2 = dict(page1, complete=True, nextCursor=None, nodes=[{'id': '2', 'type': 'video', 'label': 'B'}])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'canvas.json'
+            path.write_text(json.dumps({'pages': [page1, page2]}), encoding='utf-8')
+            self.assertEqual([n['id'] for n in load_nodes(str(path))], ['1', '2'])
+            for bad in [page1, dict(page1, detail='brief', complete=True)]:
+                path.write_text(json.dumps(bad), encoding='utf-8')
+                with self.assertRaises(ValueError): load_nodes(str(path))
+                self.assertEqual(main([str(path)]), 2)
+            for change in [dict(page2, project={'id': '101', 'currentVersion': 10}),
+                           dict(page2, nodes=page1['nodes']), dict(page2, totalNodes=3),
+                           dict(page2, scope={'kind': 'FILTERED', 'nodeType': 'video'}),
+                           dict(page2, detail='compact')]:
+                path.write_text(json.dumps({'pages': [page1, change]}), encoding='utf-8')
+                with self.assertRaises(ValueError): load_nodes(str(path))
+
 
 if __name__ == '__main__':
     unittest.main()

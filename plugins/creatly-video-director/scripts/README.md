@@ -34,6 +34,8 @@ python3 -m unittest discover -s scripts -p 'test_upload_file.py'
 
 提交分镜或视频的 `generateNodes` 之前，先把 `getCanvasContext(detail="full")` 的结果存成 JSON，再运行：
 
+新后端的 full 每页最多 5 个节点。按 nextCursor 收齐同一项目、版本、FULL 范围的全部页，将原始回执存成 `{"pages":[回执1,回执2,...]}`。最后一页必须 complete=true，且节点总数与 totalNodes 一致。脚本拒绝未读完、brief/compact、混版本及重复节点的回执，退出码为 2。旧后端无分页的完整 full 回执仍可读取。概要浏览用 brief，单节点检查用 getNodes，无需为它们读取完整门禁快照。
+
 ```bash
 python3 scripts/film_gate_check.py '/private/path/canvas.json' --nodes '<本批节点ID,逗号分隔>' --max-images 30
 ```

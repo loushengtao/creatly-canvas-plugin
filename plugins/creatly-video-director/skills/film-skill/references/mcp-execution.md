@@ -12,7 +12,7 @@
 
 标准 v2 工具参数按实时 inputSchema **平铺**传递，不包裹旧版 `payload`，不传本地 `clientId`。projectId/nodeId/elementId/assetId/fileId 原样使用各自读取接口返回的字符串；当前 v2 资源 ID 是十进制字符串，不转成 JavaScript Number，也不自行加密或解密。mentionToken、uploadId、generationRef 等标识原样保留，不从 workbench URL 推算 ID。版本号和其他字段遵循实际 Schema 的类型。
 
-找节点先读 `getCanvasOutline`，按游标逐页定位目标；已知 nodeId/externalKey 时直接读对应节点。`getCanvasContext(detail="compact")` 仍含节点正文，不把它当作轻量目录反复全量读取。只有需要完整画布快照或主体资产详情时才读取对应 context；保存回执用于同一版本的后续检查，不把大份 JSON 重复回显到对话。读取返回的 scope 必须覆盖修改范围；过滤快照不能当作完整画布。缺少字段不等于空值，不建立另一个可写 Film DSL 副本。
+先检查实时 inputSchema：支持 brief 时，用 `getCanvasContext(detail="brief", includeSubjects=false)` 按游标定位节点（仅 ID、名称、类型、状态与关系，不含正文或生成参数，最多 100 个/页）；需要正文预览时才用 `getCanvasOutline`。已知 nodeId/externalKey 时直接读对应节点。`getCanvasContext(detail="compact")` 仍含正文，最多 20 个/页；full 最多 5 个/页。`complete=false` 表示还没读完，不能因为当前页没出现目标就判定节点不存在。nextCursor 原样传回，项目、detail、nodeType、includeSubjects 保持一致；版本变化时从第一页重新读。响应上限 256 KiB，超限时减小 limit 或改用 getNodes 指定更少 fields，不能截断全文后覆盖原节点。只有需要完整画布快照或主体资产详情时才读取对应 context；保存回执用于同一版本的后续检查，不把大份 JSON 重复回显到对话。读取返回的 scope 必须覆盖修改范围；过滤快照不能当作完整画布。缺少字段不等于空值，不建立另一个可写 Film DSL 副本。
 
 ### 按需读取节点
 
@@ -90,7 +90,7 @@ full 每批最多 5 个节点，长提示词通常一次只读 1 个。full 的 
 
 - 分镜前：色卡主体已有图片。
 - 视频前：本镜出场角色各有至少 3 个视角；有场景图和对应状态的站位图；提示词 `[@]` 了全部出场主体，并写清轴线和正反打；每个镜头的物料已放进本镜组。
-- 准备提交生成时：读取一次必要的 full 画布快照并保存 JSON，同一画布版本复用已保存快照，不反复把全量正文放入对话；局部修改或移除垫图不触发这次全量门禁读取。运行插件的 `scripts/film_gate_check.py`（用法见 [脚本说明](../../../scripts/README.md)「生成前门禁」）；有未豁免的 FAIL 不提交 generateNodes。本批范围与费用已在对话中确认。
+- 准备提交生成时：只有门禁需要完整快照时才按 nextCursor 读 full 的全部页，将同一版本回执保存为 {"pages":[回执1,回执2,...]}，完整后运行门禁；同一画布版本复用已保存快照，不反复把全量正文放入对话；局部修改或移除垫图不触发这次全量门禁读取。运行插件的 `scripts/film_gate_check.py`（用法见 [脚本说明](../../../scripts/README.md)「生成前门禁」）；有未豁免的 FAIL 或脚本退出码 2 不提交 generateNodes。上下文读取超时、未读完或未成功加载，不等于门禁通过；只有用户明确豁免时才跳过相关检查。本批范围与费用已在对话中确认。
 
 用户可以对任一关卡明确说「跳过」或「这次不用」，照做即可（运行门禁时用 `--skip <关卡名>`）：在回复里点明跳过了哪一项、可能的影响，不反复劝阻。风格、景别、镜头数量、时长、垫图多少、是否先出分镜图等创作选择由用户决定，skill 只给默认值和建议，不替用户做硬性决定。
 
@@ -143,3 +143,5 @@ full 每批最多 5 个节点，长提示词通常一次只读 1 个。full 的 
 已上传的图片、视频、音频需要作为画布上的节点自身素材时（效果同在画布拖入上传），用 createNode(nodes=[{clientRef,type,label,fileRef:{id:上传回执.fileRef.id}}]) 新建，content 可省略：图片用 type="frame"、视频用 type="video"、音频用 type="audio"，文件类型须与节点类型一致；已有节点用 updateNode(nodes=[{nodeId, fileRef:{id}}]) 替换当前文件，多个节点可一次批量挂载，按最新画布提供 expectedNodeStates 和幂等键。fileRef 仅传 id；不重传已有文件，不调用 generateNodes 或 TTS，不扣费；挂载后按读取策略用 getNodes 的 media 字段核对目标文件；只有旧部署缺少此字段时，才在相关 context 中检查 frameFiles/videoFiles/audioFiles。只放进 referenceResources 或连线不会把文件挂成节点自身素材，画布上也看不到。以实时 Schema 中 fileRef 的节点类型为准：旧后端只允许 audio，需要先部署更新。
 
 视频的输入按「视频参考素材（全能参考，强制）」准备：主体 `[@主体名]`，站位图和补充视角写 referenceResources，音频按顺序连线；正反打、补拍画面不作为视频参考。跨镜头参考时显式加入本镜 Shot 并传 nodeIndex，人物图本身无需 Shot。多图模式使用 generationParams.videoType="referenceImg"；需要精确编号时按提示词顺序写 referenceResources，图片用 IMAGE/REFERENCE，配音用 AUDIO/SOURCE_AUDIO，分别对应图1…和音频1…。不要再将“一张图/一条音频”或“人物/补拍图不能连视频”当成通用限制。生成仍需核对具体模型的素材数量、格式与时长要求。首尾帧 keyframe 模式与多图 referenceImg 模式区分使用。
+
+概要/详情分层依赖后端部署。若实时 inputSchema 的 detail 尚不支持 brief，使用现有 getCanvasOutline 定位，再用 getNodes 按 ID/字段读取；不要发送未开放的字段，不把超时解释成节点不存在，也不反复重试 full 全量。

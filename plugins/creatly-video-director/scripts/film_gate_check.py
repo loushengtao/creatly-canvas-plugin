@@ -4,7 +4,7 @@
     python3 scripts/film_gate_check.py canvas.json
     python3 scripts/film_gate_check.py canvas.json --nodes <id>,<id> --skip blocking,axis
 
-canvas.json 可以是 MCP 返回的 output（含 nodes）、完整响应，或工具结果落盘的 [{type,text}] 数组。
+canvas.json 可以是完整 full 回执，或 {"pages": [同一版本的全部分页回执]}；也兼容旧版完整回执。
 FAIL 为强制关卡，存在未豁免的 FAIL 时退出码为 1；WARN 只提示。
 用户明确要求跳过某项时，用 --skip 传入关卡名，输出里会标为「用户豁免」。
 """
@@ -28,10 +28,7 @@ OPAQUE_REF = re.compile(r'^[A-Za-z0-9_-]{32,}$')
 CARD_LINE = re.compile(r'【色卡】\s*\[@')
 
 
-def load_canvas(path):
-    """返回 (nodes, subjects)。subjects 为快照里的主体库信息，可能不存在。"""
-    with open(path, encoding='utf-8') as f:
-        data = json.load(f)
+def unwrap_canvas(data):
     if isinstance(data, list):
         for item in data:
             try:
@@ -42,6 +39,50 @@ def load_canvas(path):
     for key in ('structuredContent', 'output'):
         if isinstance(data, dict) and key in data and isinstance(data[key], dict):
             data = data[key]
+    if not isinstance(data, dict) or not isinstance(data.get('nodes'), list):
+        raise ValueError('缺少画布 nodes；请保存真实 MCP 回执')
+    return data
+
+
+def load_canvas(path):
+    """Full snapshot or {pages:[...]}; reject partial/brief reads instead of passing an incomplete gate."""
+    with open(path, encoding='utf-8') as f:
+        source = json.load(f)
+    if isinstance(source, dict) and 'pages' in source:
+        raw_pages = source['pages']
+        if not isinstance(raw_pages, list) or not raw_pages:
+            raise ValueError('pages 必须是完整 full 上下文分页回执')
+        pages = [unwrap_canvas(page) for page in raw_pages]
+        first = pages[0]
+        if not isinstance(first.get('project'), dict) or 'currentVersion' not in first['project']:
+            raise ValueError('分页缺少项目或画布版本')
+        nodes, subjects, seen = [], {}, set()
+        for index, page in enumerate(pages):
+            if page.get('project') != first['project'] or page.get('scope') != first.get('scope'):
+                raise ValueError('分页项目、版本或筛选范围不一致；请重新读取')
+            if page.get('detail') != 'full' or (page.get('scope') or {}).get('kind') != 'FULL':
+                raise ValueError('门禁需要 full 的完整范围，brief/compact 或类型筛选页不能冒充全量')
+            if page.get('totalNodes') != first.get('totalNodes') or page.get('complete') is not (index == len(pages) - 1):
+                raise ValueError('分页未读完或计数不一致；请继续 nextCursor')
+            if index < len(pages) - 1 and not page.get('nextCursor'):
+                raise ValueError('分页缺少 nextCursor')
+            if index == len(pages) - 1 and page.get('nextCursor') is not None:
+                raise ValueError('最后一页仍有 nextCursor')
+            for node in page['nodes']:
+                if node['id'] in seen:
+                    raise ValueError('分页节点重复；请重新读取')
+                seen.add(node['id'])
+                nodes.append(node)
+            if page.get('subjects'):
+                subjects = page['subjects']
+        if len(nodes) != first.get('totalNodes'):
+            raise ValueError('分页节点数量不完整，不能执行门禁')
+        return nodes, subjects
+    data = unwrap_canvas(source)
+    if data.get('complete') is False:
+        raise ValueError('上下文只有一页；请继续 nextCursor，把同一版本所有 full 回执放入 pages')
+    if data.get('detail') in ('brief', 'compact'):
+        raise ValueError('概要不含生成参数；门禁需要 full 回执')
     return data['nodes'], data.get('subjects') or {}
 
 
@@ -260,7 +301,14 @@ def main(argv=None):
     args = parser.parse_args(argv)
     skip = {s.strip() for s in args.skip.split(',') if s.strip()}
     only = {s.strip() for s in args.nodes.split(',')} if args.nodes else None
-    nodes, subjects = load_canvas(args.canvas)
+    try:
+        nodes, subjects = load_canvas(args.canvas)
+    except (ValueError, KeyError) as exc:
+        if args.json:
+            print(json.dumps({'error': 'incomplete_canvas_context', 'message': str(exc)}, ensure_ascii=False))
+        else:
+            print(f'无法执行门禁：{exc}', file=sys.stderr)
+        return 2
     results = Checker(nodes, args.max_images, args.max_audios, args.max_duration, skip, subjects).run(only)
     fails = [r for r in results if r[0] == FAIL]
     if args.json:
