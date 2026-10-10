@@ -6,9 +6,12 @@ from pathlib import Path
 
 ENVIRONMENTS = {
     'dev': ('dev', 'dev.yuanji.studio', '开发', '0.2.4-dev'),
-    'test': ('test', 'test.yuanji.studio', '测试', '0.2.8-test'),
+    'test': ('test', 'test.yuanji.studio', '测试', '0.2.9-test'),
     'production': ('main', 'yuanji.studio', '生产', '0.2.4'),
 }
+
+# Keep the host's OAuth credential identity stable when releasing a new plugin version.
+MCP_SERVER_NAME = 'yuanji'
 
 def configure(root, environment):
     branch, domain, label, version = ENVIRONMENTS[environment]
@@ -16,7 +19,7 @@ def configure(root, environment):
     site = f'https://{domain}'
     endpoint = f'{site}/api/agent/mcp/v2'
     server = 'creatly' if environment == 'production' else f'creatly-{environment}'
-    servers = {'yuanji': {'type': 'http', 'url': endpoint}}
+    servers = {MCP_SERVER_NAME: {'type': 'http', 'url': endpoint}}
     def write_json(path, data):
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
     for name in ['.mcp.json', '.mcp.claude.json']:
@@ -48,7 +51,9 @@ def configure(root, environment):
         # Keep workflow documentation separate from generated installation instructions.
         tail = old[old.index('## 图片、视频、音频上传'):] if '## 图片、视频、音频上传' in old else old[old.index('## 生成确认'):]
         protocol = 'skills/film-skill/references/mcp-execution.md'
+        connection_guide = 'docs/oauth-connection.md'
         if path == root / 'README.md': protocol = 'plugins/creatly-video-director/' + protocol
+        if path == root / 'README.md': connection_guide = 'plugins/creatly-video-director/' + connection_guide
         header = f'''# Creatly Canvas Plugin · {label}环境
 
 本分支 `{branch}` 通过远程 MCP 连接 [{domain}]({site}/)，无需启动本地画布服务。
@@ -77,7 +82,16 @@ codex plugin add creatly-video-director@creatly
 /plugin install creatly-video-director@creatly
 ```
 
-安装后开启新任务，使用 `/mcp` 或宿主提示完成 yuanji 的 OAuth 授权，在 **{domain}** 登录。单纯打开网站不等于完成插件授权。
+首次连接时，按宿主提示完成 yuanji 的 OAuth 授权，在 **{domain}** 登录并选择空间。之后由宿主保存凭据和自动刷新访问令牌；开启新任务、重启宿主或更新同一环境的插件时先复用已有连接，不每天执行 `/mcp` 验证。完整失效条件与排障见 [账号连接与续期]({connection_guide})。
+
+## 一次授权与自动续期
+
+- 元极采用标准 OAuth：访问令牌默认 30 分钟，刷新令牌默认 30 天；成功刷新会返回新的访问令牌和刷新令牌，由宿主安全保存。30 天指刷新令牌有效期，不是让一个访问令牌使用 30 天；实际有效期以服务端签发结果为准。
+- 同一环境更新时保持插件名 `creatly-video-director`、MCP 名 `yuanji` 和 MCP 地址稳定。通过宿主的更新流程升级，不为日常更新卸载重装、登出或重复添加手动 MCP。
+- 正常续期不需要浏览器、保持画布打开或重新输入密码。撤销授权、刷新令牌到期、凭据丢失或切换环境后，才按宿主提示重新连接。网站登录与插件授权是两套凭据。
+- 403 是资源权限问题；429、5xx 和连接超时是请求问题。不要因此清除授权或反复登录。`invalid_client` 表示客户端注册/认证异常，`invalid_grant` 表示刷新凭据异常，应先诊断具体原因。
+
+持续授权依赖后端部署：必须发布保留关联授权的 OAuth 客户端清理修复。已被旧服务误删的客户端无法只靠更新插件恢复，修复发布后需重新授权一次；之后使用正常自动续期流程。
 
 ## WorkBuddy
 

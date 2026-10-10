@@ -4,9 +4,11 @@
 
 本分支直接连接 `https://test.yuanji.studio/api/agent/mcp/v2`，使用标准 Streamable HTTP MCP 与 OAuth。无需本地画布服务、bridge.token 或保持浏览器画布打开。由宿主完成授权发现、浏览器登录、PKCE 和令牌刷新；不索取或复制用户密码、Cookie、Access Token，不使用本地桥接替代授权。
 
-首次使用按宿主提示打开插件配置的站点完成授权，确认账号和空间。通过标准 MCP `tools/list` 获取当前部署的工具及完整 inputSchema；不要调用旧本地适配器独有的 `canvas_status`、`canvas_describe_tools` 或 `canvas_list_projects`。若宿主已发现工具，直接读取其最新定义。使用 `listProjects` 返回的 `authorizationContext` 核对账号和空间；创建项目的回执也包含该字段。
+首次连接按宿主提示打开插件配置的站点完成授权，确认账号和空间。后续任务、宿主重启和同一环境插件升级先复用宿主保存的连接，让宿主自动刷新令牌，不把每日 `/mcp`、退出重登、重装或重复添加服务器作为启动步骤。插件不自己保存或刷新用户令牌。通过标准 MCP `tools/list` 获取当前部署的工具及完整 inputSchema；不要调用旧本地适配器独有的 `canvas_status`、`canvas_describe_tools` 或 `canvas_list_projects`。若宿主已发现工具，直接读取其最新定义。使用 `listProjects` 返回的 `authorizationContext` 核对账号和空间；创建项目的回执也包含该字段。
 
 工具不可用、未授权或权限不足时给出实际错误，不能使用过期工具目录冒充连接成功。项目与模型目录通过当前实际工具查询。
+
+连接错误按 [账号连接与续期](../../../docs/oauth-connection.md) 处理：工具未注入不等于授权已失效；403 不要求重新登录；429、5xx、stream timeout 不清除连接。`invalid_client` 优先检查后端客户端注册是否仍存在及认证方法，`invalid_grant` 检查刷新凭据到期、撤销或轮换；向用户说明真实错误，不通过反复授权掩盖服务端异常。401 交给宿主标准刷新/重新连接流程，不读取宿主凭据文件或自行请求令牌。只有确认需要重新连接时才提示用户操作一次；任何请求失败后先核对原操作回执和状态，不能借重新连接重复创建、上传或付费生成。
 
 ## 参数与画布状态
 
