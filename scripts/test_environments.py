@@ -12,6 +12,28 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
 class EnvironmentPackagesTest(unittest.TestCase):
+    def test_platform_detail_ids_are_normalized_before_package_binding(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for directory in ['plugins', '.claude-plugin', '.codebuddy-plugin']:
+                shutil.copytree(ROOT / directory, root / directory, ignore=shutil.ignore_patterns('node_modules'))
+            shutil.copy(ROOT / 'README.md', root / 'README.md')
+            module.configure(root, 'test', 'plugin_asdk_app_testfixture')
+            mapping_path = root / 'config/openai-apps.json'
+            self.assertEqual(json.loads(mapping_path.read_text())['test'], 'asdk_app_testfixture')
+            app_path = root / 'plugins/creatly-video-director/.app.json'
+            self.assertEqual(json.loads(app_path.read_text())['apps']['yuanji']['id'], 'asdk_app_testfixture')
+            # Upgrade a mapping written by the previous renderer without requiring a new ID.
+            mapping_path.write_text(json.dumps({'test': 'plugin_connector_testfixture', 'dev': None}))
+            module.configure(root, 'test')
+            self.assertEqual(json.loads(mapping_path.read_text()), {'test': 'connector_testfixture', 'dev': None})
+            self.assertEqual(json.loads(app_path.read_text())['apps']['yuanji']['id'], 'connector_testfixture')
+
+    def test_invalid_platform_detail_ids_are_rejected(self):
+        for value in [None, 42, 'asdk_app_', 'asdk_app_-bad', 'asdk_app__bad', 'plugin_plugin_asdk_app_fixture', 'https://chatgpt.com/plugins/plugin_asdk_app_fixture']:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                module.normalize_openai_app_id(value)
+
     def test_registered_account_panel_binding_survives_upgrades_and_cannot_leak_between_environments(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

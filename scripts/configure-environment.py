@@ -7,12 +7,21 @@ from pathlib import Path
 
 ENVIRONMENTS = {
     'dev': ('dev', 'dev.yuanji.studio', '开发', '0.2.4-dev'),
-    'test': ('test', 'test.yuanji.studio', '测试', '0.2.10-test'),
+    'test': ('test', 'test.yuanji.studio', '测试', '0.2.11-test'),
     'production': ('main', 'yuanji.studio', '生产', '0.2.4'),
 }
 
 # Keep the host's OAuth credential identity stable when releasing a new plugin version.
 MCP_SERVER_NAME = 'yuanji'
+
+def normalize_openai_app_id(value):
+    if not isinstance(value, str):
+        raise ValueError('Use the actual registered OpenAI app ID, not an OAuth client ID or URL.')
+    # The platform detail URL uses plugin_<app ID>; .app.json requires the app ID itself.
+    value = value.removeprefix('plugin_')
+    if not re.fullmatch(r'(?:asdk_app|connector|templated_apps)_[A-Za-z0-9][A-Za-z0-9_-]*', value):
+        raise ValueError('Use the actual registered OpenAI app ID, not an OAuth client ID or URL.')
+    return value
 
 def configure(root, environment, openai_app_id=None):
     branch, domain, label, version = ENVIRONMENTS[environment]
@@ -25,15 +34,14 @@ def configure(root, environment, openai_app_id=None):
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
     mapping_path = root / 'config/openai-apps.json'
     mappings = json.loads(mapping_path.read_text()) if mapping_path.exists() else {}
+    previous_mappings = mappings.copy()
     if openai_app_id is not None:
-        if not re.fullmatch(r'(?:plugin_)?(?:asdk_app|connector)_[A-Za-z0-9_-]+', openai_app_id):
-            raise ValueError('Use the actual registered OpenAI app ID, not an OAuth client ID or URL.')
-        mappings[environment] = openai_app_id
+        mappings[environment] = normalize_openai_app_id(openai_app_id)
     registered_app_id = mappings.get(environment)
-    if registered_app_id is not None and not re.fullmatch(
-            r'(?:plugin_)?(?:asdk_app|connector)_[A-Za-z0-9_-]+', registered_app_id):
-        raise ValueError('Invalid registered OpenAI app ID for this environment.')
-    if openai_app_id is not None:
+    if registered_app_id is not None:
+        registered_app_id = normalize_openai_app_id(registered_app_id)
+        mappings[environment] = registered_app_id
+    if openai_app_id is not None or mappings != previous_mappings:
         mapping_path.parent.mkdir(parents=True, exist_ok=True)
         write_json(mapping_path, mappings)
     app_path = plugin / '.app.json'
