@@ -12,6 +12,41 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
 class EnvironmentPackagesTest(unittest.TestCase):
+    def test_registered_account_panel_binding_survives_upgrades_and_cannot_leak_between_environments(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for directory in ['plugins', '.claude-plugin', '.codebuddy-plugin']:
+                shutil.copytree(ROOT / directory, root / directory, ignore=shutil.ignore_patterns('node_modules'))
+            shutil.copy(ROOT / 'README.md', root / 'README.md')
+            plugin = root / 'plugins/creatly-video-director'
+            # This fixture ID never goes into a released package or a live platform request.
+            app_id = 'asdk_app_testfixture'
+            module.configure(root, 'test', app_id)
+            expected = {'apps': {'yuanji': {'id': app_id, 'required': True}}}
+            self.assertEqual(json.loads((plugin / '.app.json').read_text()), expected)
+            self.assertEqual(json.loads((plugin / '.codex-plugin/plugin.json').read_text())['apps'], './.app.json')
+            for host in ['claude', 'codebuddy']:
+                self.assertNotIn('apps', json.loads((plugin / f'.{host}-plugin/plugin.json').read_text()))
+            module.configure(root, 'test')
+            self.assertEqual(json.loads((plugin / '.app.json').read_text()), expected)
+            module.configure(root, 'dev')
+            self.assertFalse((plugin / '.app.json').exists())
+            self.assertNotIn('apps', json.loads((plugin / '.codex-plugin/plugin.json').read_text()))
+            module.configure(root, 'test')
+            self.assertEqual(json.loads((plugin / '.app.json').read_text()), expected)
+            self.assertEqual(json.loads((root / 'config/openai-apps.json').read_text())['test'], app_id)
+
+    def test_bad_platform_id_does_not_modify_the_package(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for directory in ['plugins', '.claude-plugin', '.codebuddy-plugin']:
+                shutil.copytree(ROOT / directory, root / directory, ignore=shutil.ignore_patterns('node_modules'))
+            shutil.copy(ROOT / 'README.md', root / 'README.md')
+            snapshot = {p.relative_to(root): p.read_bytes() for p in root.rglob('*') if p.is_file()}
+            with self.assertRaises(ValueError):
+                module.configure(root, 'test', 'oauth-client-or-access-token')
+            self.assertEqual(snapshot, {p.relative_to(root): p.read_bytes() for p in root.rglob('*') if p.is_file()})
+
     def test_each_environment_and_repeated_render(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

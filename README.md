@@ -37,6 +37,12 @@ codex plugin add creatly-video-director@creatly
 
 持续授权依赖后端部署：必须发布保留关联授权的 OAuth 客户端清理修复。已被旧服务误删的客户端无法只靠更新插件恢复，修复发布后需重新授权一次；之后使用正常自动续期流程。
 
+## Codex 已连接账户面板
+
+本环境尚未填写平台注册的元极应用 ID，因此当前安装包仍通过 MCP 连接管理授权，尚不显示平台账户面板。
+
+维护者在平台创建对应环境的自定义 MCP 插件后，将实际应用 ID 写入 `config/openai-apps.json`；详细步骤见 [账号连接与续期](plugins/creatly-video-director/docs/oauth-connection.md)。平台注册、后端部署和真实账户连接均完成后才算面板验收通过。三个环境使用各自的应用 ID，升级时保留已有映射。
+
 ## WorkBuddy
 
 下载 [test 分支 ZIP](https://github.com/loushengtao/creatly-canvas-plugin/archive/refs/heads/test.zip)，按宿主的本地 marketplace 安装流程导入。需要支持 HTTP MCP 与 OAuth；完整安装与授权流程尚未端到端验证。

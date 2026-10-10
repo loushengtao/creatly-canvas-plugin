@@ -2,18 +2,19 @@
 """Render the released branch's HTTP MCP configuration and install documentation."""
 import argparse
 import json
+import re
 from pathlib import Path
 
 ENVIRONMENTS = {
     'dev': ('dev', 'dev.yuanji.studio', '开发', '0.2.4-dev'),
-    'test': ('test', 'test.yuanji.studio', '测试', '0.2.9-test'),
+    'test': ('test', 'test.yuanji.studio', '测试', '0.2.10-test'),
     'production': ('main', 'yuanji.studio', '生产', '0.2.4'),
 }
 
 # Keep the host's OAuth credential identity stable when releasing a new plugin version.
 MCP_SERVER_NAME = 'yuanji'
 
-def configure(root, environment):
+def configure(root, environment, openai_app_id=None):
     branch, domain, label, version = ENVIRONMENTS[environment]
     plugin = root / 'plugins/creatly-video-director'
     site = f'https://{domain}'
@@ -22,6 +23,24 @@ def configure(root, environment):
     servers = {MCP_SERVER_NAME: {'type': 'http', 'url': endpoint}}
     def write_json(path, data):
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+    mapping_path = root / 'config/openai-apps.json'
+    mappings = json.loads(mapping_path.read_text()) if mapping_path.exists() else {}
+    if openai_app_id is not None:
+        if not re.fullmatch(r'(?:plugin_)?(?:asdk_app|connector)_[A-Za-z0-9_-]+', openai_app_id):
+            raise ValueError('Use the actual registered OpenAI app ID, not an OAuth client ID or URL.')
+        mappings[environment] = openai_app_id
+    registered_app_id = mappings.get(environment)
+    if registered_app_id is not None and not re.fullmatch(
+            r'(?:plugin_)?(?:asdk_app|connector)_[A-Za-z0-9_-]+', registered_app_id):
+        raise ValueError('Invalid registered OpenAI app ID for this environment.')
+    if openai_app_id is not None:
+        mapping_path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(mapping_path, mappings)
+    app_path = plugin / '.app.json'
+    if registered_app_id:
+        write_json(app_path, {'apps': {MCP_SERVER_NAME: {'id': registered_app_id, 'required': True}}})
+    elif app_path.exists():
+        app_path.unlink()
     for name in ['.mcp.json', '.mcp.claude.json']:
         write_json(plugin / name, {'mcpServers': servers})
     for host in ['codex', 'claude', 'codebuddy']:
@@ -32,6 +51,11 @@ def configure(root, environment):
         if 'url' in data.get('author', {}): data['author']['url'] = site
         if 'interface' in data: data['interface']['websiteURL'] = site
         if host == 'codebuddy': data['mcpServers'] = servers
+        if host == 'codex':
+            if registered_app_id:
+                data['apps'] = './.app.json'
+            else:
+                data.pop('apps', None)
         write_json(path, data)
     for host in ['claude', 'codebuddy']:
         path = root / f'.{host}-plugin/marketplace.json'
@@ -93,6 +117,12 @@ codex plugin add creatly-video-director@creatly
 
 持续授权依赖后端部署：必须发布保留关联授权的 OAuth 客户端清理修复。已被旧服务误删的客户端无法只靠更新插件恢复，修复发布后需重新授权一次；之后使用正常自动续期流程。
 
+## Codex 已连接账户面板
+
+{'本环境已关联平台注册的元极应用。安装后在插件设置中连接账户；账户名称由后端的 `getProfile` 返回，面板由平台展示。' if registered_app_id else '本环境尚未填写平台注册的元极应用 ID，因此当前安装包仍通过 MCP 连接管理授权，尚不显示平台账户面板。'}
+
+维护者在平台创建对应环境的自定义 MCP 插件后，将实际应用 ID 写入 `config/openai-apps.json`；详细步骤见 [账号连接与续期]({connection_guide})。平台注册、后端部署和真实账户连接均完成后才算面板验收通过。三个环境使用各自的应用 ID，升级时保留已有映射。
+
 ## WorkBuddy
 
 下载 [{branch} 分支 ZIP](https://github.com/loushengtao/creatly-canvas-plugin/archive/refs/heads/{branch}.zip)，按宿主的本地 marketplace 安装流程导入。需要支持 HTTP MCP 与 OAuth；完整安装与授权流程尚未端到端验证。
@@ -139,5 +169,6 @@ claude mcp add --transport http {server} {endpoint}
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('environment', choices=ENVIRONMENTS)
+    parser.add_argument('--openai-app-id', help='Actual registered OpenAI app ID for this environment.')
     args = parser.parse_args()
-    configure(Path(__file__).resolve().parents[1], args.environment)
+    configure(Path(__file__).resolve().parents[1], args.environment, args.openai_app_id)
